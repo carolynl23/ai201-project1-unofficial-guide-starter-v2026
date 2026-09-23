@@ -149,30 +149,123 @@ The housing lottery is not random in the way most people assume. Rising sophomor
 
 ## Sample Answer
 
-<!-- One complete question and answer, pasted as text, with the source line
-     visible. Milestone 4. -->
-
-**Question:**
+**Question:** How late in the semester can I declare a course pass/fail?
 
 **Answer:**
 
 ```
+  (best distance 0.206, cutoff 0.6)
+
+You can declare a course pass/fail as late as week eight, after you've seen
+your midterm.
+
+Source: admin_pass_fail_option.txt
+
+Sources retrieved: admin_add_drop_deadline.txt, admin_declaring_a_major.txt,
+admin_graduation_requirements.txt, admin_pass_fail_option.txt,
+advising_registration.txt
 ```
 
-**My relevance cutoff:**
+And the same system asked something it has no business answering, refused
+before any model call was made:
 
-<!-- The number you set in config.py, and how you got there.
+```
+$ python app.py ask "How do I change the oil in a diesel engine?"
+  (best distance 0.923, cutoff 0.6)
 
-     You ran five questions your corpus covers and the five in OUT_OF_SCOPE
-     that it clearly doesn't, and wrote down the best distance for each. What
-     did those two groups look like? Where was the gap? Put the actual numbers
-     here — the table below wants all ten rows.
+I don't have enough information about that.
 
-     Milestone 4. -->
+0 model calls this session
+```
+
+**My relevance cutoff:** **0.60**
 
 | Question | In corpus? | Best distance |
 |---|---|---|
-|  |  |  |
+| How is lottery order decided for juniors and seniors in the housing lottery? | yes | 0.2011 |
+| How late in the semester can I declare a course pass/fail? | yes | 0.2058 |
+| How long is the wait at Kestrel Commons between 12:15 and 1:00? | yes | 0.2129 |
+| What time does the library close during reading week? | yes | 0.2192 |
+| What do the laundry machines in Aldridge Hall cost, and how do you pay? | yes | 0.2446 |
+| What is the capital of Mongolia? | no | 0.8246 |
+| What is the recommended dosage of ibuprofen for a headache? | no | 0.8477 |
+| How do I write a for loop in Rust? | no | 0.8768 |
+| Who won the 1994 World Cup? | no | 0.8859 |
+| How do I change the oil in a diesel engine? | no | 0.9231 |
+
+Two groups, 0.201–0.245 and 0.825–0.923, with a gap 0.58 wide. Every cutoff
+between 0.3 and 0.8 scores the same on this table, which is the problem with
+it: **the gap is a measure of how easy I made both halves.** My five questions
+use the corpus's own proper nouns — "Kestrel Commons", "Aldridge Hall",
+"reading week" — and the out-of-scope five are from other planets. Nothing in
+those ten numbers told me where to put the cutoff, so I went looking for the
+middle.
+
+| Probe | Best distance |
+|---|---|
+| "which building has somewhere quiet to work late at night" (covered) | 0.3384 |
+| "when should I do my laundry to avoid waiting for a dryer" (covered) | 0.3790 |
+| "What are the dorm rooms like in Ashford Hall?" (**no such hall**) | 0.4046 |
+| "What time does the campus gym open?" (**not covered**) | 0.4214 |
+| "is it worth eating lunch early to skip the queue" (covered) | 0.4823 |
+| "can I still drop a class after seeing my midterm grade" (covered) | 0.5246 |
+| "How much is tuition next year?" (**not covered**) | 0.5594 |
+| "How do I sign up for intramural sports?" (**not covered**) | 0.6357 |
+
+These two groups overlap, and they overlap in the wrong direction: a question
+about a hall that does not exist (0.405) comes back *closer* than a real
+question about dropping a class (0.525). **No cutoff separates them.** A
+distance is a measure of topical similarity, and "campus housing, invented
+building" is topically identical to "campus housing, real building".
+
+So 0.60 is chosen against the covered questions, not the uncovered ones. It
+clears the worst real paraphrase I found, 0.525, with enough room that a
+clumsier phrasing of a question I can answer still gets answered. It sits below
+the nearest uncovered campus question I found, 0.636. And it refuses all five
+OUT_OF_SCOPE questions, which sit 0.22 above it, before a single model call.
+
+What I get wrong at 0.60: the Ashford Hall question, the gym question and the
+tuition question all pass the gate. They have to — anything low enough to stop
+them refuses real questions first. Those are the grounding instruction's job,
+and it does catch them; all three are refused at the second layer, which is
+what that layer is for. What I'd get wrong at 0.45 is worse and quieter: I'd
+refuse "can I still drop a class after seeing my midterm grade" while the
+answer sat in the index.
+
+**Two other retrieval decisions, both measured:**
+
+*top_k stays at 5.* All five test questions put the answering chunk at rank 1,
+so k=3 would have passed the same tests. I kept 5 because the second and third
+chunks carry corroboration where one document is written up twice — the Kestrel
+Commons question retrieves both the original post and the follow-up thread.
+
+*But not all five chunks reach the model.* The cost of k=5 is noise on narrow
+questions: the housing lottery question retrieves one chunk at 0.20 and four
+between 0.71 and 0.79, and those four are parking permits and grade appeals.
+Rather than lower k and lose the corroboration, `gate.relevant()` drops chunks
+further than the cutoff before the prompt is assembled. Narrow question, one
+chunk in the prompt; broad question, all five. Same number governs both, so
+there's no second threshold to keep in step.
+
+**The grounding instruction, and what I changed.** The starter's version held
+up better than I expected. I tried to make it drift — asked about a hall that
+doesn't exist with five real halls in the prompt, asked about the campus gym
+when the nearest document is the shuttle timetable, asked about Kestrel Commons
+at dinner when the corpus only covers lunch — and it refused all three without
+being asked twice. I found no substitution to fix.
+
+What I did change was the wording of refusals. The starter says "say you don't
+have enough information", and the model did, in a different sentence every
+time: *"I don't have enough information to answer your question, as Ashford
+Hall is not mentioned..."*, *"I do not have enough information to answer what
+time the campus gym opens."* None of them matched `gate.REFUSAL`, the sentence
+the gate returns on its own path. The same outcome looked like two different
+things depending on which layer produced it, and counting refusals meant
+reading them one by one. The instruction now asks for that exact sentence, and
+all four near-miss questions return it verbatim. I also added a rule naming the
+substitution risk — don't answer about Aldridge when asked about Ashford — which
+is precautionary rather than a fix, because this corpus is built from
+near-identical templates and that is the specific way it would fail.
 
 ## How I Used AI
 

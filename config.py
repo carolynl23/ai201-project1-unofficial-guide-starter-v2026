@@ -68,15 +68,44 @@ CHUNK_HARD_MAX = 600    # only above this is a single paragraph split internally
 
 TOP_K = 5               # how many chunks to pull back per question
 
+# Kept at 5, measured rather than left alone. All five of my test questions put
+# the answering chunk at rank 1, so k=3 would have served them — but the second
+# chunk is doing real work on the questions where one document corroborates
+# another (Kestrel Commons is written up twice, and both come back). The cost of
+# k=5 is that a narrow question drags in noise: the housing lottery question
+# retrieves one chunk at 0.20 and four between 0.71 and 0.79. That noise is
+# handled by trimming below the cutoff before the prompt is built — see
+# gate.relevant() — rather than by lowering k and losing the corroboration.
+
 # The relevance gate. If the best chunk is further away than this, the system
 # refuses to answer instead of handing the model thin material.
 #
 # LOWER IS BETTER: 0.3 is a close match, 0.9 is unrelated.
 #
-# 0.6 is a reasonable starting point, not a right answer. Milestone 4 has you
-# measure your own two groups of distances and put the cutoff in the gap.
-# Most corpora land somewhere between 0.45 and 0.75.
-THRESHOLD = 0.6
+# Measured in Milestone 4, and the measurement I trust is not the obvious one.
+# My five test questions come back at 0.201–0.245 and the five OUT_OF_SCOPE
+# questions at 0.825–0.923, a gap 0.58 wide that any cutoff from 0.3 to 0.8
+# would sit in. That gap is an artifact of how I wrote the questions: mine use
+# the corpus's own proper nouns, and the out-of-scope five are from other
+# planets. Both groups are easy, so neither constrains the number.
+#
+# What constrains it is the middle, which I had to go and probe for:
+#   • in-corpus questions asked in a student's words, without proper nouns,
+#     come back at 0.338–0.525 ("can I still drop a class after seeing my
+#     midterm grade" is 0.525 and the corpus does answer it)
+#   • campus questions the corpus simply doesn't cover come back at
+#     0.405–0.819 ("what are the dorm rooms like in Ashford Hall", a hall that
+#     doesn't exist, is 0.405 — CLOSER than the real question above)
+# The two overlap. No cutoff separates them, so the gate cannot be what stops
+# an Ashford Hall question; the grounding instruction has to, and it does.
+#
+# 0.60 is therefore chosen against the first group, not the second: it clears
+# the worst real paraphrase I found (0.525) by enough that a slightly clumsier
+# phrasing still gets answered, and still sits below the nearest uncovered
+# campus question I could find (intramural sports, 0.636). Going lower protects
+# nothing the grounding layer isn't already protecting, and starts refusing
+# questions I have the answer to.
+THRESHOLD = 0.60
 
 
 # ─── Models ──────────────────────────────────────────────────────────────────

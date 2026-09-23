@@ -273,11 +273,31 @@ def generate(prompt: str, system: str | None = None, cache: bool = True) -> str:
 
 # ─── The grounded answer ─────────────────────────────────────────────────────
 
+# Tightened in Milestone 4. Two changes, and only one of them was because the
+# starter's version got something wrong.
+#
+# The refusal wording was the real problem. The starter asks the model to "say
+# you don't have enough information", and it does — but in its own words every
+# time. Three near-miss questions produced three different sentences and none
+# of them matched gate.REFUSAL, which is the sentence the gate itself returns.
+# So the same outcome, a refusal, came out looking like two different things
+# depending on which layer produced it, and counting refusals meant reading
+# them. Now both layers say the same sentence.
+#
+# The rule about named things is precautionary and I want to be straight about
+# that: I went looking for substitution drift and didn't find any. Asked about
+# a hall that doesn't exist, with five real halls in the prompt, the starter's
+# version refused cleanly. But this corpus is built out of near-identical
+# templates — seven laundry documents differing by one price line, nine course
+# families — so substituting a neighbour is the specific way this corpus would
+# fail, and it costs nothing to name it.
 GROUNDING_INSTRUCTION = """You answer questions using only the documents provided to you.
 
 Rules:
 - Use only the information in the documents below. Do not use anything you know from elsewhere.
-- If the documents don't cover the question, say you don't have enough information. Do not guess.
+- If the documents don't cover the question, reply with exactly this sentence and nothing else: "I don't have enough information about that." Do not guess, and do not answer partially.
+- The documents describe specific named things — halls, dining halls, courses, buildings. If the question asks about one the documents don't name, that is a question they don't cover, even when a similar one appears. Do not answer about Aldridge when asked about Ashford.
+- Answer only what was asked. If the documents cover lunch and the question is about dinner, they don't cover the question.
 - Name the document your answer came from, using the filename given in each excerpt.
 - Be brief. Two or three sentences is usually enough."""
 

@@ -226,13 +226,20 @@ def ask_pipeline(
         outcome["answer"] = gate.REFUSAL
         return outcome
 
-    prompt = build_prompt(question, results)
+    # Only the chunks that are actually close go in front of the model. The
+    # gate said this question is answerable; this says what it's answerable
+    # from. See gate.relevant().
+    grounding = gate.relevant(results, threshold=threshold)
+
+    prompt = build_prompt(question, grounding)
     if on_prompt is not None:
         on_prompt(prompt)
 
     outcome["prompt"] = prompt
-    outcome["answer"] = answer_from_chunks(question, results)
-    outcome["sources"] = sorted({r.source for r in results})
+    outcome["answer"] = answer_from_chunks(question, grounding)
+    outcome["sources"] = sorted({r.source for r in grounding})
+    outcome["retrieved"] = len(results)
+    outcome["grounded_on"] = len(grounding)
     return outcome
 
 

@@ -42,6 +42,29 @@ class GateDecision:
         )
 
 
+def relevant(results: list[Result], threshold: float | None = None) -> list[Result]:
+    """
+    Trim the retrieved chunks down to the ones actually close to the question.
+
+    `check` above decides whether to answer at all, using the best chunk. This
+    decides which of the rest are worth putting in front of the model, using
+    the same cutoff, so there is still only one number to keep in step.
+
+    It exists because top_k is a fixed number and relevance isn't. The housing
+    lottery question retrieves one chunk at 0.20 and four between 0.71 and
+    0.79 — the four are the closest thing the corpus has to a question it
+    can't otherwise match, and putting them in the prompt invites the model to
+    answer out of parking permits. A broad question keeps all five.
+
+    Never returns empty: if `check` passed, the chunk it passed on is kept.
+    """
+    threshold = config.THRESHOLD if threshold is None else threshold
+    kept = [r for r in results if r.distance < threshold]
+    if not kept and results:
+        kept = [min(results, key=lambda r: r.distance)]
+    return kept
+
+
 def check(results: list[Result], threshold: float | None = None) -> GateDecision:
     """
     Decide whether the retrieved chunks are close enough to answer from.

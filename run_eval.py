@@ -63,9 +63,15 @@ def run_once(question: str, top_k, threshold, corpus, variant):
     if not decision.passed:
         return gate.REFUSAL, results, decision
 
+    # Trim to the chunks actually within the cutoff, exactly as app.py's
+    # ask_pipeline does. Without this the eval measures a system nobody uses:
+    # the model would be answering from five chunks here and from the relevant
+    # subset in the app, and the run log would be evidence about the wrong one.
+    grounding = gate.relevant(results, threshold=threshold)
+
     # cache=False on purpose. Three runs have to be three real answers.
-    answer = answer_from_chunks(question, results, cache=False)
-    return answer, results, decision
+    answer = answer_from_chunks(question, grounding, cache=False)
+    return answer, grounding, decision
 
 
 def main():
