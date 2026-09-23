@@ -29,68 +29,122 @@
 
 ## Chunking Strategy
 
-**Chunk size:**
-**Overlap:**
+**Chunk size:** 250 body characters maximum, 90 minimum, produced by
+`chunker.py::split_documents`. "Body" means the text under the title line — the
+title is repeated into every chunk and doesn't count against the budget. Real
+output: 134 chunks from 88 documents, 217 characters on average, shortest 103,
+longest 397.
 
-<!-- What about YOUR documents made you pick these numbers? Short posts and
-     long sectioned guides don't want the same chunking, and "800 seemed
-     reasonable" earns nothing. Point at something you noticed when you read
-     the documents in Milestone 1.
+**Overlap:** none. The title line is repeated instead.
 
-     If you changed your mind partway through, say so and say why. That's worth
-     more than pretending you got it right first time.
+The starter's 800-character window made 88 chunks out of 88 documents — it
+never cut anything, because the longest document in `campus_life` is 549
+characters and the average is 317. That isn't a bug, it's the finding: for these
+documents, one post already is one chunk. The question is whether that's right,
+and for about half of them it isn't. Kestrel Commons is one paragraph about
+queues and stir-fry and a second about opening hours and the price of a swipe.
+As a single chunk it matches a question about hours weakly and a question about
+queues weakly. So: **split on paragraph breaks**, which in this corpus are where
+the thoughts change.
 
-     Milestone 3. -->
+Paragraph splitting alone would have been worse than what I started with. There
+are 183 body paragraphs and 99 of them are under 120 characters — splitting on
+every break turns half the index into fragments like *"Expect 4 hours a week
+outside class."* So paragraphs are **packed**: they accumulate until the body
+passes 250, and anything left under the floor merges back into the chunk before
+it instead of being emitted alone. 250 because the median paragraph is 112
+characters, so 250 holds the common two-short-paragraph case together while
+still cutting a document that holds two separate thoughts. No paragraph is ever
+cut open — the longest one in the corpus is 373 characters, and there is a hard
+ceiling of 600 above which a paragraph would be split on sentence boundaries,
+which never fires here.
+
+**Overlap is zero, and that's a change from the starter's 120.** Overlap exists
+to heal a cut that lands mid-sentence. My chunker only cuts at paragraph breaks,
+so there is no cut to heal, and character overlap would drag a half-sentence
+from the next paragraph onto the end of every chunk. What neighbouring chunks
+share instead is the title line, because that is the context that actually goes
+missing when you split one of these documents.
+
+**The title line on every chunk is the part I'd defend hardest.** The seven
+laundry documents are word-for-word identical apart from their first line and
+one price line — *"There are eight washers and six dryers for the building,
+which is the wrong ratio"* appears in all seven, verbatim. Take the second
+paragraph of one of them on its own and nothing in the text says which building
+it is. Not for a reader, and not for an embedding. The same is true of the 21
+housing documents and the 27 course documents, which follow templates just as
+closely.
+
+**I changed my mind once, and the first version was wrong in an instructive
+way.** I set the floor at 120 characters, ran it, and Kestrel Commons came out
+whole — the exact document I'd written the splitter for. Its second paragraph is
+101 characters, under the floor, so the "no orphan tails" rule glued it back on.
+The floor was doing the opposite of its job: it was meant to stop fragments, and
+instead it was swallowing complete thoughts. *"Hours are 7:00am to 9:00pm
+weekdays, 9:00am to 8:00pm weekends. Costs one meal swipe, or $12.50 cash."* is
+two complete sentences and answers a real question. Reading the paragraphs by
+length showed the line sits lower than I guessed: under 60 characters they're
+one-liners with no retrievable signal alone, and by 90 they're reliably two full
+sentences. The floor moved to 90 and the corpus went from 111 chunks to 134.
+
+There was also a measurement bug behind it. I was counting a group's length as
+the sum of its paragraphs plus two characters per paragraph for the blank-line
+join, which over-counts a single-paragraph group by two — a 119-character
+paragraph measured as 121 and cleared a 120 floor it should have failed. The
+length is now computed from the joined string, the thing actually being stored.
 
 ## Sample Chunks
 
-<!-- Five chunks, pasted as text. Label each one and name the file it came from
-     AND the function that produced it — the grader checks your code against
-     what you claim here.
+### Chunk 1 — A document that came apart — the queue half
 
-     `python app.py chunks -n 5` prints all three for you. Copy them straight
-     across.
-
-     Milestone 3. -->
-
-======================================================================
-Chunk 1  |  source: thread_bike_commute.txt#0  |  produced by: chunker.py::fallback_split
-======================================================================
-THREAD: Is a bike worth it for a 20 minute walk commute?
-
---- reply 1 (14 votes) ---
-Yeah. Cuts an 18 minute walk to about 6. The thing nobody mentions is storage — covered bike parking exists at three buildings and is full by 9am at all three.
-
---- reply 2 (9 votes) ---
-Counterpoint, I sold mine. Between November and March the paths are either icy or salted and salt destroys a drivetrain in one season.
-
---- reply 3 (22 votes) ---
-Both true. I keep a cheap bike for September to November and walk the rest of the year. Total cost was about $120 for the bike and I don't care what happens to it.
-
---- reply 4 (5 votes) ---
-If you do get one, the campus does free registration and it's the only reason I got mine back after it was taken.
-
-For each one, ask: could someone answer a question using only this,
-without reading what came before or after?
-
-**Chunk 2** — source: `` — produced by: ``
+`source: dining_kestrel_commons.txt#0` · `produced by: chunker.py::split_documents`
 
 ```
+Kestrel Commons
+
+I'm a junior and I've done this twice now. Wait times: 20 to 25 minutes between 12:15 and 1:00, under 5 minutes before 11:45. The thing worth going for is the stir-fry station, made to order. The thing to know is that the salad bar wilts after 1:30.
 ```
 
-**Chunk 3** — source: `` — produced by: ``
+### Chunk 2 — The other half of the same document
+
+`source: dining_kestrel_commons.txt#1` · `produced by: chunker.py::split_documents`
 
 ```
+Kestrel Commons
+
+Hours are 7:00am to 9:00pm weekdays, 9:00am to 8:00pm weekends. Costs one meal swipe, or $12.50 cash.
 ```
 
-**Chunk 4** — source: `` — produced by: ``
+### Chunk 3 — Why the title line is repeated
+
+`source: housing_aldridge_hall_laundry.txt#0` · `produced by: chunker.py::split_documents`
 
 ```
+Laundry in Aldridge Hall
+
+Machines take $1.75 wash, $1.50 dry, card only. There are eight washers and six dryers for the building, which is the wrong ratio and means the dryers back up on Sunday evenings.
 ```
 
-**Chunk 5** — source: `` — produced by: ``
+### Chunk 4 — A one-line paragraph packed with its neighbour
+
+`source: course_econ_101.txt#0` · `produced by: chunker.py::split_documents`
 
 ```
+ECON 101 Introduction to Economics
+
+Took this last spring. Format is large lecture, 300 people, with small discussion sections. Assessment: two midterms and a final, all multiple choice. Curved, and generously.
+
+Expect 4 hours a week outside class.
+```
+
+### Chunk 5 — A document left whole
+
+`source: admin_housing_lottery.txt#0` · `produced by: chunker.py::split_documents`
+
+```
+On the housing lottery
+
+The housing lottery is not random in the way most people assume. Rising sophomores get a number drawn at random, but juniors and seniors are ordered by accumulated credit hours first, and only tie-break randomly. That means a senior who took summer courses reliably beats a senior who didn't. Numbers come out the second week of March and selection runs over four evenings.
 ```
 
 ## Sample Answer

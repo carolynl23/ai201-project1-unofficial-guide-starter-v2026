@@ -24,11 +24,44 @@ CORPUS = os.getenv("AI201_CORPUS", "campus_life")
 
 
 # ─── Chunking (Milestone 3) ──────────────────────────────────────────────────
-# These are deliberately plain, generic numbers. Milestone 3 is where you
-# replace them with numbers that fit the documents you actually read.
+# These two belong to `fallback_split` — the starter's fixed-window chunker.
+# They are left at the original values on purpose: fallback_split is what I
+# compare my own chunker against, so it has to keep behaving the way it did.
+# On campus_life an 800-character window splits nothing (longest document: 549).
 
-CHUNK_SIZE = 800        # characters per chunk
-CHUNK_OVERLAP = 120     # characters shared between neighbouring chunks
+CHUNK_SIZE = 800        # characters per chunk       (fallback_split only)
+CHUNK_OVERLAP = 120     # characters shared between neighbouring chunks (ditto)
+
+# These are mine, used by `split_documents`. The unit is body characters —
+# the title line every chunk carries is not counted, since it is repeated
+# rather than being content the chunk is spending its budget on.
+#
+# Why 250: the median body paragraph in campus_life is 112 characters and the
+# longest is 373, so 250 packs the common case of two short paragraphs into one
+# chunk while still cutting a document that holds two genuinely separate
+# thoughts (Kestrel Commons: crowd advice, then hours and prices).
+#
+# Why a 90 floor: I set this at 120 first and it was wrong — it swallowed the
+# split it was supposed to protect. Kestrel Commons is a 249-character
+# paragraph about queues followed by a 101-character one about hours and
+# prices; the floor pushed the second back onto the first and the document came
+# out whole, which is the thing I changed the chunker to stop doing. Reading
+# the paragraphs by length, the line sits lower than I guessed: the ten blocks
+# under 60 characters are one-liners ("Expect 4 hours a week outside class.")
+# that carry no retrievable signal alone, while by 90 characters a paragraph is
+# reliably two complete sentences. Below the floor a paragraph merges with its
+# neighbour rather than being emitted alone.
+#
+# Why no overlap at all: the fixed-window chunker needs overlap because it cuts
+# mid-sentence and the overlap heals the cut. Mine cuts only at paragraph
+# breaks, so there is no cut to heal — and character overlap would drag a
+# half-sentence from the next paragraph into every chunk. What neighbouring
+# chunks share instead is the title line, which is the context that actually
+# goes missing when you split one of these documents.
+
+CHUNK_MAX_BODY = 250    # start a new chunk once the body passes this
+CHUNK_MIN_BODY = 90     # never emit a chunk with less body than this
+CHUNK_HARD_MAX = 600    # only above this is a single paragraph split internally
 
 
 # ─── Retrieval (Milestone 4) ─────────────────────────────────────────────────

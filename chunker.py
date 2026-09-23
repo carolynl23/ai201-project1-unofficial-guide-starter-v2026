@@ -22,6 +22,7 @@ to it, write down what you saw, and move on. That's a real observation about
 your pipeline, not giving up.
 """
 
+import re
 from dataclasses import dataclass
 
 import config
@@ -80,24 +81,112 @@ def fallback_split(
     return chunks
 
 
+def _split_long_paragraph(block: str, limit: int) -> list[str]:
+    """
+    Break one oversized paragraph on sentence boundaries, never mid-sentence.
+
+    This does not fire on campus_life — the longest body paragraph in the
+    corpus is 373 characters and the ceiling is 600. It exists so that one
+    unusually long document can't put a 2,000-character wall into the index.
+    """
+    sentences = re.split(r"(?<=[.!?])\s+", block)
+    pieces: list[str] = []
+    current = ""
+    for sentence in sentences:
+        if current and len(current) + len(sentence) + 1 > limit:
+            pieces.append(current)
+            current = sentence
+        else:
+            current = f"{current} {sentence}".strip()
+    if current:
+        pieces.append(current)
+    return pieces
+
+
 def split_documents(documents: list[Document]) -> list[Chunk]:
     """
-    Split documents into chunks. ⚠️ REPLACE THE BODY OF THIS IN MILESTONE 3.
+    Split on paragraph breaks, pack small paragraphs together, and give every
+    chunk the document's title line.
 
-    Right now it just calls the fallback. That is the plain, generic behaviour
-    the brief is talking about.
+    Written for campus_life: 88 short posts, 178 to 549 characters, each one a
+    title line followed by one to four paragraphs. Three things follow from
+    reading them.
 
-    When you write your own strategy, set `produced_by` to
-    "chunker.py::split_documents" so your README's Sample Chunks section names
-    the right function. `app.py chunks` prints that string for you.
+    A paragraph is the unit of thought here, so a paragraph break is where a
+    cut belongs. The starter cut at 800 characters, which on these documents
+    meant it never cut at all — every post went into the index whole, including
+    the ones holding two unrelated thoughts. Kestrel Commons has one paragraph
+    about queues and stir-fry and another about opening hours and the price of
+    a swipe; as one chunk it matches a question about hours weakly and a
+    question about queues weakly.
 
-    Things worth thinking about before you write any code:
-      - Are your documents short posts or long guides?
-      - Is the useful information in one sentence, or spread over a paragraph?
-      - Would splitting on paragraph breaks keep more thoughts intact than
-        splitting on a character count?
+    But most paragraphs are too small to stand alone — 99 of 183 are under 120
+    characters — so paragraph splitting on its own trades one problem for a
+    worse one. Hence packing: paragraphs accumulate until the body passes
+    CHUNK_MAX_BODY, and a leftover under CHUNK_MIN_BODY goes back onto the
+    chunk before it rather than becoming a fragment.
+
+    And the title line goes on every chunk, which matters more in this corpus
+    than any of the size numbers. Seven laundry documents are word-for-word
+    identical apart from their first line and one price line: "There are eight
+    washers and six dryers for the building" appears in all seven, verbatim.
+    Take the second paragraph of one of them on its own and nothing in the text
+    says which building it is — not for a reader, not for an embedding. The
+    title is what makes the chunk answerable, so it is repeated into each one.
     """
-    return fallback_split(documents)
+    chunks: list[Chunk] = []
+
+    for doc in documents:
+        blocks = [b.strip() for b in doc.text.split("\n\n") if b.strip()]
+        if not blocks:
+            continue
+
+        title, body_blocks = blocks[0], blocks[1:]
+        if not body_blocks:
+            # A title and nothing under it. Keep it; don't invent content.
+            body_blocks = [title]
+
+        # Only genuinely oversized paragraphs get opened up.
+        expanded: list[str] = []
+        for block in body_blocks:
+            if len(block) > config.CHUNK_HARD_MAX:
+                expanded.extend(_split_long_paragraph(block, config.CHUNK_MAX_BODY))
+            else:
+                expanded.append(block)
+
+        # Pack paragraphs into groups, respecting the floor over the ceiling:
+        # going over CHUNK_MAX_BODY is better than emitting a fragment.
+        def body_length(group: list[str]) -> int:
+            """What the group will actually measure once joined."""
+            return len("\n\n".join(group))
+
+        groups: list[list[str]] = []
+        current: list[str] = []
+        for block in expanded:
+            fits = body_length(current + [block]) <= config.CHUNK_MAX_BODY
+            if current and not fits and body_length(current) >= config.CHUNK_MIN_BODY:
+                groups.append(current)
+                current = []
+            current.append(block)
+        if current:
+            if groups and body_length(current) < config.CHUNK_MIN_BODY:
+                groups[-1].extend(current)     # no orphan tails
+            else:
+                groups.append(current)
+
+        for index, group in enumerate(groups):
+            body = "\n\n".join(group)
+            text = body if body == title else f"{title}\n\n{body}"
+            chunks.append(
+                Chunk(
+                    text=text,
+                    source=doc.source,
+                    index=index,
+                    produced_by="chunker.py::split_documents",
+                )
+            )
+
+    return chunks
 
 
 def describe(chunks: list[Chunk]) -> str:
