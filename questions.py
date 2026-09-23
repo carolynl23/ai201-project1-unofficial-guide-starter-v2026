@@ -22,12 +22,38 @@ names a target of "4 of 5", and four of three is not a thing.
 """
 
 QUESTIONS = [
-    # {"question": "...", "expects": "..."},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
+    # Two documents cover this one (dining_kestrel_commons.txt and its
+    # followup), and both give the same figure — this is the easy one.
+    {
+        "question": "How long is the wait at Kestrel Commons between 12:15 and 1:00?",
+        "expects": "20 to 25 minutes",
+    },
+    # admin_pass_fail_option.txt only. The deadline is the part the document
+    # says "nobody mentions", so nothing else in the corpus repeats it.
+    {
+        "question": "How late in the semester can I declare a course pass/fail?",
+        "expects": "week eight",
+    },
+    # housing_aldridge_hall_laundry.txt. Seven buildings have near-identical
+    # laundry documents — every one of them says "eight washers and six
+    # dryers", and only the payment line differs. "card only" is Aldridge's
+    # alone, so this expects fails if retrieval brings back the wrong hall.
+    {
+        "question": "What do the laundry machines in Aldridge Hall cost, and how do you pay for them?",
+        "expects": "card only",
+    },
+    # study_library_hours.txt. The reading-week hours are shorter than term
+    # hours, which is the counterintuitive part.
+    {
+        "question": "What time does the library close during reading week?",
+        "expects": "10pm",
+    },
+    # admin_housing_lottery.txt only, and the word "lottery" pulls against
+    # eight other housing documents. This is the one I expect to be hard.
+    {
+        "question": "How is lottery order decided for juniors and seniors in the housing lottery?",
+        "expects": "credit hours",
+    },
 ]
 
 # Questions from a different world entirely. Your gate should refuse all five.
