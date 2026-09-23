@@ -79,7 +79,7 @@ near whatever gap the other four leave.
 
 ---
 
-## 4. Something about your chunks
+## 4. Every chunk carries its document's title line
 
 Every chunk contains the first line of the document it came from — the line
 that names the hall, the dining hall, or the course. All chunks, not a sample,

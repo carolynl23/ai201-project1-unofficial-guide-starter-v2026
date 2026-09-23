@@ -1,6 +1,7 @@
 # The Unofficial Guide
 
-<!-- Replace this line with your name and which corpus you picked. -->
+**Name:** <!-- ← put your name here -->
+**Corpus:** `campus_life` — 88 posts of student advice about one invented campus.
 
 > **This file is your submission.** Fill it in as you go — most sections get
 > written during the milestone that produces them, not at the end.
@@ -21,11 +22,32 @@
 
 ## What This Does
 
-<!-- Three or four sentences. Which corpus you picked, and the kinds of
-     questions your system answers. Write it for someone who has never seen
-     this repo.
+This is a question-answering system over `campus_life`, a corpus of 88 short
+posts — around 28,000 characters in total — in which students write down the
+things about one invented campus that nobody tells you at orientation. The
+documents are dining hall write-ups, dorm-by-dorm notes on laundry and noise,
+course pages for nine classes, and administrative explainers on the things
+students work out from each other: the pass/fail deadline, how the housing
+lottery is really ordered, what the printing quota actually buys.
 
-     Milestone 5. -->
+Ask it a specific question about that campus — *how late can I declare a course
+pass/fail*, *what do the laundry machines in Aldridge Hall cost*, *what time
+does the library close during reading week* — and it retrieves the passages
+most likely to hold the answer, answers from those passages only, and names the
+file it used. It is not a chatbot with opinions about the campus. Every claim it
+makes should be traceable to a document, and where it can't be, the system is
+built to say so.
+
+That last part is the half that took the work. Two layers decide when not to
+answer. A relevance gate compares the closest retrieved chunk against a measured
+cutoff and refuses outright when nothing is close enough, before any model call
+happens — which is how questions about diesel engines and the 1994 World Cup get
+turned away for free. Questions the gate can't catch, because they are *about*
+this campus but not covered by these documents — a hall that doesn't exist, the
+opening hours of a gym nobody wrote about — reach the model with real documents
+attached, and a grounding instruction is what stops it answering from what it
+already knows. Both layers return the same sentence: *I don't have enough
+information about that.*
 
 ## Chunking Strategy
 
@@ -269,18 +291,52 @@ near-identical templates and that is the specific way it would fail.
 
 ## How I Used AI
 
-<!-- Two specific moments. For each: what you asked for, what came back, and
-     what you changed about it.
+I used Claude Code throughout, and the two moments below are the ones where
+what came back was not what went in.
 
-     "I asked Claude to write the chunking function from my notes. It ignored
-     the overlap, so I added that myself" is the level of detail we're after.
-     "I used AI to help me code" is not.
+**1. The chunker's minimum size, which was set to the wrong number and hid a
+bug underneath it.** I asked for a chunker built from the measurements I'd
+taken off the corpus: split on paragraph breaks, pack the short paragraphs
+together, put the document's title line on every chunk, and never emit anything
+under a 120-character floor. What came back did all four and passed every check
+I could put to it — 111 chunks, nothing under the floor, nothing cut
+mid-sentence, every chunk carrying its title. It was still wrong, and the
+checks were never going to show it. Kestrel Commons came out as a single chunk,
+and Kestrel Commons is the exact document the splitter existed for: one
+paragraph about queues, one about opening hours and the price of a swipe. Its
+second paragraph is 101 characters, under the floor, so the "no orphan tails"
+rule glued it back onto the first. The floor was supposed to stop fragments and
+was swallowing complete thoughts instead.
 
-     Milestone 5. -->
+What I changed: I went back to the paragraph lengths rather than picking
+another round number. Under 60 characters they're one-liners with no
+retrievable signal alone — *"Expect 4 hours a week outside class."* — and by 90
+they're reliably two complete sentences. The floor moved to 90 and the corpus
+went from 111 chunks to 134. Chasing it also turned up a real bug in the code
+that came back: a group's length was being computed as the sum of its
+paragraphs plus two characters each for the blank-line join, which over-counts
+a group of one, so a 119-character paragraph measured as 121 and cleared a
+120-character floor it should have failed.
 
-**1.**
+**2. A test question whose `expects` string would have scored a wrong answer as
+correct.** I asked for five test questions specific enough to have right
+answers, each with a short phrase a correct answer would have to contain.
+One came back as *"How many washers and dryers are there in Aldridge Hall?"*,
+expecting `eight washers`. Read on its own that looks fine, and it is exactly
+the kind of question I'd have written myself.
 
-**2.**
+What I changed: checking the phrase against the corpus before trusting it
+showed that all seven laundry documents contain *"eight washers and six dryers
+for the building"* word for word — the buildings differ only in their title
+line and one price line. An answer about Old Brewhouse would have contained
+`eight washers` and scored as correct, so the question would have been
+measuring nothing. The only detail unique to Aldridge is that its machines are
+card only, where the others are app-based, coin-only, or both. The question
+became *"What do the laundry machines in Aldridge Hall cost, and how do you pay
+for them?"* expecting `card only`, which now fails if retrieval brings back the
+wrong building. Retrieval does get it right — Aldridge at 0.245, the
+near-identical Old Brewhouse at 0.351 — but the test can now tell the
+difference, which it couldn't before.
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
