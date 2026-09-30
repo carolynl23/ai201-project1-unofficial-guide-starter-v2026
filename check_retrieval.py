@@ -48,6 +48,13 @@ def check(corpus: str | None = None, variant: str = "default",
         kept = gate.relevant(results, threshold=threshold)
 
         holding = [r for r in kept if expects.lower() in r.text.lower()]
+        # Which rank the answer arrived at. Criterion 1 only asks that it be
+        # somewhere in the kept chunks, so this records how much slack the
+        # criterion is actually giving me.
+        rank = next(
+            (i for i, r in enumerate(kept, 1) if expects.lower() in r.text.lower()),
+            None,
+        )
         rows.append(
             {
                 "question": question,
@@ -55,6 +62,7 @@ def check(corpus: str | None = None, variant: str = "default",
                 "kept": [(r.label, r.distance) for r in kept],
                 "holding": [(r.label, r.distance) for r in holding],
                 "found": bool(holding),
+                "rank": rank,
                 "refused": not decision.passed,
                 "best_distance": decision.best_distance,
             }
@@ -83,14 +91,19 @@ def main():
         print(f"  chunks given to the model: "
               f"{', '.join(f'{label} at {d:.3f}' for label, d in row['kept'])}")
         if row["found"]:
-            print(f"  ANSWER PRESENT in: "
+            print(f"  ANSWER PRESENT at rank {row['rank']} of "
+                  f"{len(row['kept'])} kept: "
                   f"{', '.join(f'{label} at {d:.3f}' for label, d in row['holding'])}")
         else:
             print("  ANSWER NOT PRESENT in any chunk the model was given")
 
     found = sum(r["found"] for r in rows)
     refused = sum(r["refused"] for r in rows)
+    ranks = [r["rank"] for r in rows if r["rank"]]
     print(f"\nCriterion 1 — answer present in a retrieved chunk: {found} of {len(rows)}")
+    print(f"             — answer present in the TOP-RANKED chunk: "
+          f"{sum(r == 1 for r in ranks)} of {len(rows)} "
+          f"(ranks: {', '.join(str(r) for r in ranks)})")
     print(f"Criterion 5 — answerable questions refused by the gate: {refused} of {len(rows)}")
 
 

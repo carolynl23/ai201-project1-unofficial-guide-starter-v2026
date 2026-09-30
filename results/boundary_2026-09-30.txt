@@ -1,0 +1,49 @@
+Milestone 3 — where the criteria are and aren't measured, 2026-09-30
+
+=== python check_boundary.py  (check_boundary.py::measure) ===
+
+cutoff 0.6, sorted by distance. 'wrong' = the gate did the opposite of what the question deserves.
+
+  dist  gate            group                      question
+ 0.201  answers         test question (covered)    How is lottery order decided for juniors and seniors
+ 0.206  answers         test question (covered)    How late in the semester can I declare a course pass
+ 0.213  answers         test question (covered)    How long is the wait at Kestrel Commons between 12:1
+ 0.219  answers         test question (covered)    What time does the library close during reading week
+ 0.245  answers         test question (covered)    What do the laundry machines in Aldridge Hall cost, 
+ 0.338  answers         probe (covered)            which building has somewhere quiet to work late at n
+ 0.379  answers         probe (covered)            when should I do my laundry to avoid waiting for a d
+ 0.405  answers  wrong  probe (uncovered)          What are the dorm rooms like in Ashford Hall?
+ 0.421  answers  wrong  probe (uncovered)          What time does the campus gym open?
+ 0.482  answers         probe (covered)            is it worth eating lunch early to skip the queue
+ 0.525  answers         probe (covered)            can I still drop a class after seeing my midterm gra
+ 0.559  answers  wrong  probe (uncovered)          How much is tuition next year?
+                                                   ── cutoff 0.6 ──
+ 0.636  refuses         probe (uncovered)          How do I sign up for intramural sports?
+ 0.825  refuses         out of scope (uncovered)   What is the capital of Mongolia?
+ 0.848  refuses         out of scope (uncovered)   What is the recommended dosage of ibuprofen for a he
+ 0.877  refuses         out of scope (uncovered)   How do I write a for loop in Rust?
+ 0.886  refuses         out of scope (uncovered)   Who won the 1994 World Cup?
+ 0.923  refuses         out of scope (uncovered)   How do I change the oil in a diesel engine?
+
+covered questions, distance range:   0.201 – 0.525
+uncovered questions, distance range: 0.405 – 0.923
+the gate is wrong about 3 of 18, all of them uncovered questions it answers:
+  0.405  What are the dorm rooms like in Ashford Hall?
+  0.421  What time does the campus gym open?
+  0.559  How much is tuition next year?
+
+=== python check_retrieval.py  (rank of the answer chunk) ===
+
+
+Criterion 1 — answer present in a retrieved chunk: 5 of 5
+             — answer present in the TOP-RANKED chunk: 5 of 5 (ranks: 1, 1, 1, 1, 1)
+Criterion 5 — answerable questions refused by the gate: 0 of 5
+
+=== python tools/audit_citations.py  (criterion 2, as written and tightened) ===
+
+Auditing results/run_2026-09-30_0158_before.md
+
+15 answers checked
+answers naming no source (criterion 2 as written): 0
+answers citing a file retrieval did not return: 0
+answers whose cited files exclude the document holding the answer (criterion 2 tightened): 0

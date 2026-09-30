@@ -661,6 +661,138 @@ Milestone 3's problem, not a revision: the criterion measured what it said.
 
      Milestone 3. -->
 
+I missed nothing. Five of five MET, and three of the five were not close: 5 of 5
+against a target of 4, 134 of 134, 0 refusals out of 5.
+
+So the honest question isn't which stage failed. It's whether five targets that
+all held say anything about the system, and going through them one at a time the
+answer is no. **My five criteria were set low in one way, for one reason, and it
+is a property of the question set rather than of five separate targets.**
+
+### The pattern: every criterion is measured at the ends, never in the middle
+
+`check_boundary.py::measure` puts all eighteen questions I have on one axis —
+the five test questions, the eight near-boundary probes from Milestone 4, and
+the five out-of-scope questions — sorted by distance, with what the gate does to
+each. Full output in `results/boundary_2026-09-30.txt`:
+
+```
+  dist  gate            group                      question
+ 0.201  answers         test question (covered)    How is lottery order decided for juniors and seniors
+ 0.206  answers         test question (covered)    How late in the semester can I declare a course pass
+ 0.213  answers         test question (covered)    How long is the wait at Kestrel Commons between 12:1
+ 0.219  answers         test question (covered)    What time does the library close during reading week
+ 0.245  answers         test question (covered)    What do the laundry machines in Aldridge Hall cost,
+ 0.338  answers         probe (covered)            which building has somewhere quiet to work late at n
+ 0.379  answers         probe (covered)            when should I do my laundry to avoid waiting for a d
+ 0.405  answers  wrong  probe (uncovered)          What are the dorm rooms like in Ashford Hall?
+ 0.421  answers  wrong  probe (uncovered)          What time does the campus gym open?
+ 0.482  answers         probe (covered)            is it worth eating lunch early to skip the queue
+ 0.525  answers         probe (covered)            can I still drop a class after seeing my midterm gra
+ 0.559  answers  wrong  probe (uncovered)          How much is tuition next year?
+                                                   ── cutoff 0.6 ──
+ 0.636  refuses         probe (uncovered)          How do I sign up for intramural sports?
+ 0.825  refuses         out of scope (uncovered)   What is the capital of Mongolia?
+ 0.848  refuses         out of scope (uncovered)   What is the recommended dosage of ibuprofen for a he
+ 0.877  refuses         out of scope (uncovered)   How do I write a for loop in Rust?
+ 0.886  refuses         out of scope (uncovered)   Who won the 1994 World Cup?
+ 0.923  refuses         out of scope (uncovered)   How do I change the oil in a diesel engine?
+
+covered questions, distance range:   0.201 – 0.525
+uncovered questions, distance range: 0.405 – 0.923
+the gate is wrong about 3 of 18, all of them uncovered questions it answers:
+  0.405  What are the dorm rooms like in Ashford Hall?
+  0.421  What time does the campus gym open?
+  0.559  How much is tuition next year?
+```
+
+Read the third column. **Every question any of my five criteria is measured on
+is one of the ten at the two ends of that list.** The five test questions occupy
+0.201 to 0.245; the five out-of-scope questions occupy 0.825 to 0.923. The eight
+questions in between — the region where covered and uncovered actually overlap,
+0.405 to 0.525 — are governed by no criterion I wrote. That is why all five held,
+and it is one fact about my test set rather than five facts about my targets.
+
+The three the gate gets wrong are all in that middle, and all the same kind of
+wrong: an uncovered question it answers. Not one of them is reachable by any
+criterion I have. Criterion 3 asks about out-of-corpus questions and tests it
+with Mongolia and diesel engines; criterion 5 asks about answerable questions and
+tests it with five that share proper nouns with their documents. Neither can see
+a question about a hall that doesn't exist.
+
+### The stage, and the mechanism
+
+**Embedding, surfacing at retrieval.** Not a bug — a limit I built a criterion
+around without noticing. A cosine distance measures topical similarity and
+nothing else, so *"What are the dorm rooms like in Ashford Hall?"* is
+topically indistinguishable from the same question about Aldridge: campus,
+housing, dorm rooms, one proper noun. The index has twenty-one housing documents
+and the invented hall lands at 0.405, closer than *"can I still drop a class
+after seeing my midterm grade"* at 0.525, which the corpus genuinely answers.
+
+The gate is a single scalar compared against a single number. "On topic but not
+covered" is not a distance, so no value of `THRESHOLD` expresses it — which is
+what my unit 1 notes already said ("no cutoff separates them") and what
+criterion 3 then quietly stopped testing by pinning itself to five questions
+from other planets. The generation stage is what actually catches these: unit 1
+found all three refused by the grounding instruction in `generate.py`. So the
+system has a second layer doing the work, and **no criterion of mine measures
+that layer at all** — the one place the mechanism lives is the one place I never
+put a number.
+
+### Were the targets set low, and which would I tighten
+
+Yes — four of the five, and only criterion 4 comes out of this clean. I can put
+numbers on how much slack each was carrying.
+
+| Criterion | As written | What the system actually does | Slack |
+|---|---|---|---|
+| 1. Answer in retrieved chunks | 4 of 5, anywhere in the kept chunks | 5 of 5, and at **rank 1** every time (`check_retrieval.py`, ranks 1,1,1,1,1) | Two ways: one question of headroom, and four ranks |
+| 2. Answer names a source | any source, 5 of 5 | 15 of 15 name a file, all retrieved, and all 15 cite a file that **contains** the answer (`tools/audit_citations.py`) | Counts naming, not correctness |
+| 3. Gate stops uncovered questions | 4 of 5, on `OUT_OF_SCOPE` | 5 of 5 there — and **1 of 4** on uncovered questions about this campus | The sample, entirely |
+| 4. Chunks carry title line | all chunks | 134 of 134, 0 trivial passes, index current | None — this one is honest |
+| 5. No answerable question refused | 0 of 5, proper-noun questions | 0 of 5, and 0 of 4 on harder paraphrases too, though 0.525 leaves only 0.075 | The sample |
+
+**The one I would tighten is criterion 3, and I would change its question set
+rather than its number.** New version:
+
+> When I ask a question about this campus that my documents don't cover, the
+> system returns "I don't have enough information about that" for at least 4 of
+> 5 — measured on five questions that are on-topic and uncovered, not five from
+> unrelated domains.
+
+That is the tightening worth having because **it is the only one that fails
+today.** Of the four on-topic uncovered questions I have, the gate stops exactly one:
+Ashford Hall at 0.405, the gym at 0.421 and tuition at 0.559 all pass it, and
+only intramural sports at 0.636 is refused. I need a fifth before I can state it
+as "of 5", but 1 of 4 against a target of 4 of 5 is a MISS by any rounding — and
+a MISS that points at something real rather than at a number I chose badly.
+
+The other two tightenings I'd make are worth less, because both already pass:
+criterion 1 becomes "the **top-ranked** kept chunk contains the answer, 4 of 5"
+(currently 5 of 5), and criterion 2 becomes "every answer names a source
+document that **contains** the answer it gave" (currently 15 of 15). Neither
+would have caught anything this unit. They are regression guards for Milestone
+4's change, not new challenges — if a chunking change pushes an answer from rank
+1 to rank 4, criterion 1 as written still passes and I never hear about it.
+
+**I have not revised anything in `criteria.md`, and I don't think I should.** A
+criterion that measured what it said, on the set it named, and came out MET is
+not broken; it's easy. The rule I was given is that a target I merely beat stays
+where it is, and criterion 3 named its five questions explicitly, so 5 of 5
+stands as the answer to the question I actually asked. What I've found is that I
+asked an easy question — which belongs here in the diagnosis, where it can drive
+the improvement, rather than rewritten into last unit's file where it would look
+like I'd known all along.
+
+One honest complication, since criterion 3 is the one I'm calling easy: its
+*words* are broader than its question set. "A question my documents clearly
+don't cover" describes Ashford Hall — there is no Ashford Hall — and the system
+answers that one. `criteria.md` pins the criterion to the five in `OUT_OF_SCOPE`,
+so MET is the correct verdict for it as written. But a reader going by the
+sentence alone would reach the opposite verdict, and they would be pointing at
+the more useful truth.
+
 ## The Improvement
 
 **What I changed:**
