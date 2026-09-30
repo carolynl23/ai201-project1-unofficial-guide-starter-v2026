@@ -337,6 +337,62 @@ for them?"* expecting `card only`, which now fails if retrieval brings back the
 wrong building. Retrieval does get it right — Aldridge at 0.245, the
 near-identical Old Brewhouse at 0.351 — but the test can now tell the
 difference, which it couldn't before.
+### Unit 2
+
+Three more, and the pattern across all three is that the useful move was making
+the model check a claim against my data rather than argue for it.
+
+**3. A confident account of my own reasoning that my own notes disproved.** Asked
+to argue against my five MET verdicts, the strongest objection that came back was
+that criterion 5 was circular: I had set the 0.60 cutoff by looking at the
+distances of the same five questions criterion 5 then tested, so it could not
+have come out any other way. That is a good argument. It is also not what I did,
+and my own Milestone 4 section above says so — I set 0.60 against a worst-case
+paraphrase at 0.525 and the nearest uncovered campus question at 0.636, neither
+of which is one of my five test questions.
+
+What I changed: the objection got rewritten into the one that survives contact
+with the file. Criterion 5's weakness isn't circular tuning, it's that all five
+of its questions share proper nouns with the documents answering them, so they
+land at 0.201–0.245 while the paraphrase that could actually falsify it sits at
+0.525 — 0.075 from the cutoff, not 0.355. Same verdict, MET, for a completely
+different reason. The lesson I'd carry: a plausible reconstruction of why I did
+something is not evidence of why I did it, and mine was in writing.
+
+**4. Two fixes killed by their own data before I built either.** For Milestone 4
+the first idea was a term-coverage gate: refuse when the question uses a word the
+corpus never uses. It explains the Ashford Hall failure exactly and I was ready
+to build it. Measuring it across all eighteen questions first showed that "lunch",
+"close", "eating", "decided" and "seeing" are all absent from this corpus and all
+come from questions it answers — the rule would have refused nearly every real
+question. The second idea, that uncovered questions come back "flat" because they
+match a template rather than a document, pointed the wrong way on the data:
+covered questions have rank-1-to-rank-2 gaps as small as 0.000, the uncovered
+near-corpus three sit at 0.040 to 0.048.
+
+What I changed: the surviving version only looks at capitalised names, which is a
+narrower fix than I wanted and the only one the eighteen questions supported. Both
+rejected measurements are committed in `results/rejected_signals_2026-09-30.txt`,
+because a rejected idea with numbers attached is worth more to me than the same
+idea re-proposed next month. This is also where a model helped most: not by
+spotting the pattern, but by making the pattern cheap enough to test that I tested
+three ideas instead of building the first.
+
+**5. A tooling failure that looked briefly like a finding.** Mid-unit I ran
+`tools/smoke_test.py`, a maintainer script that sets `AI201_FAKE_EMBEDDINGS=1` and
+rebuilds `campus_life__default`. Every distance I measured for the next few
+minutes was garbage — 0.81 to 0.97 for all eighteen questions — and the gate
+"refused" every question including the five it answers.
+
+What I changed: nothing in the code, but the read of it. The tell was that
+covered and uncovered questions moved *together*, and no gate change can alter a
+distance. A number that shifts for every group at once is a broken measurement,
+not a result. I re-indexed, then re-ran the before measurement with
+`AI201_GATE_ENTITIES=0` to confirm it reproduced the committed numbers exactly —
+3 of 18 wrong, covered 0.201–0.525 — before I trusted a single after number. The
+before/after pair in this README is measured on one index, minutes apart, with one
+flag between them.
+
 
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
@@ -909,9 +965,105 @@ measured on the same index, minutes apart, one flag between them.
 
      Milestone 5. -->
 
+No criterion was missed, so nothing here is a criterion I failed. Everything
+here is something the five criteria don't reach, which after Milestone 3 is the
+more honest list anyway.
+
+**1. Two of the three near-corpus failures survive, and they need something that
+isn't a word test.** *"What time does the campus gym open?"* (0.421) and *"How
+much is tuition next year?"* (0.559) still pass the gate and still cost a model
+call each, 586 and 300 tokens. Both name their uncovered subject in lowercase,
+and I measured that refusing on a lowercase word the corpus never uses would
+refuse real questions — "lunch", "close", "eating" and "seeing" are all absent
+from this corpus and all come from questions it answers.
+
+What I'd do: ask the model itself, once, cheaply — hand it the retrieved chunks
+and the question and get a yes/no on whether these chunks can answer this, before
+spending the real call. Why I stopped: that costs a model call to save a model
+call, so it is only worth building if the cheap call can be made much cheaper
+than the real one, and I couldn't establish that inside this unit. The honest
+position is that these two questions are already answered correctly by the
+grounding instruction, so what I'm chasing is cost, not correctness.
+
+**2. My own fix has two blind spots I can demonstrate.** The entity check looks at
+capitalised words and skips the first one, and both limits are reachable by
+typing:
+
+```
+$ python app.py ask "what are the dorm rooms like in ashford hall?"
+  (best distance 0.405, cutoff 0.6)
+I don't have enough information about that.
+1 model calls this session, 601 tokens (591 in, 10 out)
+
+$ python app.py ask "Ashford Hall dorm rooms — what are they like?"
+  (best distance 0.406, cutoff 0.6)
+I don't have enough information about that.
+1 model calls this session, 613 tokens (603 in, 10 out)
+```
+
+The same question in lowercase, and the same question with the invented name
+moved to the front, both walk straight past the check that was built for them.
+Note what *didn't* break: both still refuse, because the grounding instruction
+catches them. The gate's saving is what evaporates, not the answer.
+
+What I'd do: case-fold the comparison and treat any capitalised-or-not token that
+is rare in the corpus as a candidate name, which turns this from a capitalisation
+rule into a document-frequency rule and fixes both cases at once. Why I stopped:
+that is the same "rare word" idea my vocabulary test already killed once, and
+getting it right means a real IDF threshold measured against this corpus rather
+than another guess. It is one change, and this unit already had its one change.
+
+**3. The layer doing the real work still has no criterion.** Every near-corpus
+question the gate lets through is caught by the grounding instruction in
+`generate.py`, verified end to end in Milestone 2 and again here — and not one of
+my five criteria measures it. If that instruction regressed tomorrow, four of my
+criteria would still pass and the system would start answering confidently about
+halls that don't exist.
+
+What I'd do: a sixth criterion, measured through `app.py ask` rather than through
+retrieval — for at least 4 of 5 on-topic uncovered questions, the system returns
+the exact refusal string. Why I stopped: criteria are supposed to be written
+before the results exist, and I now know what this one would score. Writing it
+now would be writing a criterion I've already passed. It belongs at the start of
+the next unit.
+
+**4. Criterion 5 is still measured at the easy end.** 0 refusals of 5, on five
+questions that share their proper nouns with the documents answering them. The
+paraphrase set that would actually test it doesn't exist, and for the same reason
+as above: I've now seen that the worst paraphrase I could write lands at 0.525,
+0.075 from the cutoff, so any five I write today I'd be picking with that number
+in mind.
+
+**5. Everything above rests on eighteen questions.** Nine covered, nine not. "The
+gate is wrong about 2 of 18" is a real measurement and a small one, and the three
+groups were written by me, which is the limitation no amount of re-running fixes.
+
 ## What I'd Do Differently
 
 <!-- Knowing what you know now — which of your five criteria would you write
      differently, and why?
 
      Milestone 5. -->
+
+Four of the five, and the same thing is wrong with all four: **I chose my
+question set before my criteria, and I chose it out of the two easiest places to
+be right.** Five questions using the corpus's own proper nouns, five questions
+from other planets. Every target then held, and Milestone 4 showed what that
+costs — a fix for a real failure produced a run log identical in all fifteen
+cells.
+
+| # | As written | What I'd write next time | Why |
+|---|---|---|---|
+| 1 | Answer somewhere in the retrieved chunks, 4 of 5 | Answer in the **top-ranked** kept chunk, 4 of 5 | It was already 5 of 5 at rank 1, so the criterion was carrying four ranks of slack it never needed. As written, a chunking change could push an answer from rank 1 to rank 4 and I'd never hear about it. |
+| 2 | Every answer names a source, 5 of 5 | Every answer names a source **that contains the answer it gave**, 5 of 5 | Naming isn't the hard part — every chunk arrives with its filename in metadata. Correct attribution is, and `tools/audit_citations.py` shows the system already does it 15 of 15, so this costs me nothing and would catch a real regression. |
+| 3 | Gate stops out-of-corpus questions, 4 of 5, on `OUT_OF_SCOPE` | Same target, on five questions **about this campus** that the corpus doesn't cover | Mongolia and diesel engines test a distinction the embedding makes for free. On-topic uncovered questions test the one that's hard, and the system scores 2 of 4 there — a miss I'd have found in unit 1 instead of unit 2. |
+| 4 | Every chunk carries its document's title line, all chunks | **Unchanged** | The only one I'd leave alone. It named an absolute target, it was measurable over the index rather than a sample, it survived two attempts to make it pass trivially, and it was the one criterion written to constrain a change I hadn't made yet. |
+| 5 | No test question refused, 0 of 5 | 0 of 5 refused, on **five paraphrases** that avoid the corpus's proper nouns | "Kestrel Commons" and "Aldridge Hall" can't produce a borderline distance. The paraphrase at 0.525 can, and it's the question that would tell me whether 0.60 is right. |
+
+The structural change I'd make is upstream of all five. I'd pick the question set
+first, spread deliberately across the distance range — including the 0.40 to 0.60
+band where covered and uncovered overlap — and only then write criteria against
+it. Every criterion I wrote was answerable from ten questions at the extremes, so
+five targets held and told me almost nothing. The measurement that actually taught
+me something this unit, `check_boundary.py`, isn't a criterion at all; it's the
+eighteen-question table I built after the criteria had all passed.
