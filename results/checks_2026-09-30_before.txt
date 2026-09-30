@@ -1,0 +1,45 @@
+Checks for criteria 1, 4 and 5 — before
+Run: 2026-09-30, corpus campus_life, top-k 5, cutoff 0.60
+
+=== python check_retrieval.py  (check_retrieval.py::check) ===
+
+How long is the wait at Kestrel Commons between 12:15 and 1:00?
+  expects: '20 to 25 minutes'
+  best distance: 0.2129 (passed the gate)
+  chunks given to the model: dining_kestrel_commons_followup.txt#0 at 0.213, dining_kestrel_commons.txt#1 at 0.281, dining_halden_hall_followup.txt#0 at 0.402, dining_the_ridgeway_cafe_followup.txt#0 at 0.407, dining_kestrel_commons.txt#0 at 0.426
+  ANSWER PRESENT in: dining_kestrel_commons_followup.txt#0 at 0.213, dining_kestrel_commons.txt#0 at 0.426
+
+How late in the semester can I declare a course pass/fail?
+  expects: 'week eight'
+  best distance: 0.2058 (passed the gate)
+  chunks given to the model: admin_pass_fail_option.txt#0 at 0.206, admin_declaring_a_major.txt#0 at 0.429, admin_add_drop_deadline.txt#0 at 0.465, admin_graduation_requirements.txt#0 at 0.537, advising_registration.txt#1 at 0.582
+  ANSWER PRESENT in: admin_pass_fail_option.txt#0 at 0.206
+
+What do the laundry machines in Aldridge Hall cost, and how do you pay for them?
+  expects: 'card only'
+  best distance: 0.2446 (passed the gate)
+  chunks given to the model: housing_aldridge_hall_laundry.txt#0 at 0.245, housing_aldridge_hall.txt#1 at 0.307, housing_old_brewhouse_laundry.txt#0 at 0.351, housing_old_brewhouse.txt#1 at 0.372, housing_innisfree_hall_laundry.txt#0 at 0.385
+  ANSWER PRESENT in: housing_aldridge_hall_laundry.txt#0 at 0.245, housing_aldridge_hall.txt#1 at 0.307
+
+What time does the library close during reading week?
+  expects: '10pm'
+  best distance: 0.2192 (passed the gate)
+  chunks given to the model: study_library_hours.txt#0 at 0.219, housing_morrow_house_noise.txt#0 at 0.442, admin_library_holds.txt#0 at 0.474, dining_north_kitchen_followup.txt#1 at 0.491, housing_calder_annexe_noise.txt#1 at 0.500
+  ANSWER PRESENT in: study_library_hours.txt#0 at 0.219
+
+How is lottery order decided for juniors and seniors in the housing lottery?
+  expects: 'credit hours'
+  best distance: 0.2011 (passed the gate)
+  chunks given to the model: admin_housing_lottery.txt#0 at 0.201
+  ANSWER PRESENT in: admin_housing_lottery.txt#0 at 0.201
+
+Criterion 1 — answer present in a retrieved chunk: 5 of 5
+Criterion 5 — answerable questions refused by the gate: 0 of 5
+
+=== python check_titles.py  (check_titles.py::check) ===
+Collection: campus_life__default
+Documents on disk: 88
+Chunks indexed: 134
+Chunks containing their document's title line: 134 of 134
+
+All indexed chunks carry their title line.

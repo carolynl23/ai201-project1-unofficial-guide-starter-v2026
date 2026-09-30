@@ -365,15 +365,193 @@ difference, which it couldn't before.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunk contains the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Every chunk carries its document's title line | all chunks | 134/134 | 134/134 | 134/134 | MET |
+| 5. Gate does not refuse questions the corpus can answer | 0 refused of 5 | 0/5 | 0/5 | 0/5 | MET |
+
+Three runs of `python run_eval.py --label before`, caching off, corpus
+`campus_life`, top-k 5, cutoff 0.60. The run it produced is
+`results/run_2026-09-30_0158_before.md`; an earlier pass,
+`results/run_2026-09-30_0149_before.md`, is committed too and agrees with it on
+every distance and every verdict. There is no `scorer.py` yet, so the Run
+columns in those files are blank and the counts above are my own reading of the
+fifteen answers.
+
+**Four of these five criteria don't move between runs, and that's a property of
+the system rather than a shortcut.** Only criterion 2 is measured on generated
+text. Criterion 3 is a comparison against a fixed number, criterion 4 is a
+property of the index, and criteria 1 and 5 are decided by retrieval, which
+returned byte-identical distances on all three runs and again on the 01:49 pass
+— 0.2129, 0.2058, 0.2446, 0.2192, 0.2011, the same five numbers every time. So
+the one column that could have varied is criterion 2, and it came out 5/5 three
+times: all fifteen answers named a file.
+
+Criterion 1 needed a check the run log can't give me. The run log names the
+*documents* retrieved, but my chunker splits 88 documents into 134 chunks, so
+"`study_library_hours.txt` was retrieved" doesn't establish that the chunk
+retrieved was the one with the closing time in it. As it happens, reading the
+document names would have given the same 5/5 — but that was luck rather than
+evidence, and `check_retrieval.py` shows why it isn't safe to rely on next time:
+for two questions the chunk carrying the answer is not the top-ranked chunk of
+its own document. `dining_kestrel_commons.txt` is retrieved twice over, as
+`#1` at 0.281 without the wait time in it and as `#0` at 0.426 with it, and the
+`card only` line comes back in `housing_aldridge_hall.txt#1` rather than in that
+file's first chunk. The run log prints one document name in both cases. Any
+change to the chunking would move which chunk that is, so a document-level
+reading could report a pass on a chunk that doesn't hold the answer.
+
+The miss I predicted in `criteria.md` didn't happen. I wrote that the housing
+lottery question would be the one criterion 1 failed on, and instead it is the
+closest match of the five, at 0.2011. I have left the prediction where it is and
+will diagnose it under Milestone 3 rather than editing it now.
 
 <!-- Underneath, paste the REAL output for each criterion from one of your
      runs — the actual text your system produced, not a description of it.
      Name the file and function that produced it. -->
+
+### Real output
+
+All of it is from the same set of runs, 2026-09-30. Full files:
+`results/run_2026-09-30_0158_before.md` (the three runs) and
+`results/checks_2026-09-30_before.txt` (the two checks).
+
+**Criterion 1 — retrieved chunk contains the answer.** Produced by
+`check_retrieval.py::check`, over chunks from `chunker.py::split_documents`
+retrieved by `store.py::search` and trimmed by `gate.py::relevant`. Two of the
+five questions, including the one where the chunk index matters:
+
+```
+What do the laundry machines in Aldridge Hall cost, and how do you pay for them?
+  expects: 'card only'
+  best distance: 0.2446 (passed the gate)
+  chunks given to the model: housing_aldridge_hall_laundry.txt#0 at 0.245, housing_aldridge_hall.txt#1 at 0.307, housing_old_brewhouse_laundry.txt#0 at 0.351, housing_old_brewhouse.txt#1 at 0.372, housing_innisfree_hall_laundry.txt#0 at 0.385
+  ANSWER PRESENT in: housing_aldridge_hall_laundry.txt#0 at 0.245, housing_aldridge_hall.txt#1 at 0.307
+
+How is lottery order decided for juniors and seniors in the housing lottery?
+  expects: 'credit hours'
+  best distance: 0.2011 (passed the gate)
+  chunks given to the model: admin_housing_lottery.txt#0 at 0.201
+  ANSWER PRESENT in: admin_housing_lottery.txt#0 at 0.201
+
+Criterion 1 — answer present in a retrieved chunk: 5 of 5
+```
+
+Note the second one: the gate kept a single chunk out of the five retrieved. The
+other four came back between 0.71 and 0.79 and `gate.py::relevant` trimmed them,
+so the model answered from one chunk.
+
+**Criterion 2 — every answer names a source.** Produced by
+`generate.py::answer_from_chunks`, logged by `run_eval.py::write_report` into
+`results/run_2026-09-30_0158_before.md`. The housing lottery question on three
+separate runs, to show what does and doesn't vary between them — the distance
+and source lines are the run log's, the fenced text is the answer as produced:
+
+Run 1 — best distance 0.2011 (passed the gate), sources retrieved
+`admin_housing_lottery.txt`:
+
+```
+Juniors and seniors are ordered by accumulated credit hours first, and only tie-broken randomly.
+
+Source: admin_housing_lottery.txt
+```
+
+Run 2 — best distance 0.2011 (passed the gate), sources retrieved
+`admin_housing_lottery.txt`:
+
+```
+For juniors and seniors, lottery order is determined by accumulated credit hours first, with a random tie-break used only when necessary.
+
+Source: admin_housing_lottery.txt
+```
+
+Run 3 — best distance 0.2011 (passed the gate), sources retrieved
+`admin_housing_lottery.txt`:
+
+```
+Juniors and seniors are ordered by accumulated credit hours first, and only tie-broken randomly.
+
+Source: admin_housing_lottery.txt
+```
+
+The wording moves between runs and the cited file does not. Across all fifteen
+answers the citation format varied — `Source: x.txt` on its own line, `(Source:
+x.txt and y.txt)`, or a bare `(x.txt)` at the end of the sentence — but every
+one of the fifteen named at least one real file from the corpus, which is what
+the criterion asks. It does not ask that the citation be the right file, and I
+did not count that here; see the note at the end of criterion 2 in `criteria.md`.
+
+**Criterion 3 — the gate stops out-of-corpus questions.** Produced by
+`run_eval.py::check_out_of_scope`, deciding with `gate.py::check` at cutoff
+0.60. One deterministic pass, which is why the same number is in all three run
+columns:
+
+```
+| Out-of-scope question | Best distance | Gate |
+|---|---|---|
+| What is the capital of Mongolia? | 0.825 | refused |
+| How do I change the oil in a diesel engine? | 0.923 | refused |
+| Who won the 1994 World Cup? | 0.886 | refused |
+| What is the recommended dosage of ibuprofen for a headache? | 0.848 | refused |
+| How do I write a for loop in Rust? | 0.877 | refused |
+```
+
+Each of those returns `I don't have enough information about that.` from
+`gate.py`, and costs no model call, because a refused question never reaches
+`generate.py`. The ibuprofen question is the one I expected to slip through,
+because `health_center.txt` is in the corpus; it came back at 0.848, which is the
+nearest of the five out-of-corpus questions bar Mongolia — so my reasoning was
+roughly right and it still wasn't a close call.
+
+**Criterion 4 — every chunk carries its document's title line.** Produced by
+`check_titles.py::check`, which reads the indexed collection back out of Chroma
+rather than re-chunking the documents, so it measures what the system is
+actually searching:
+
+```
+Collection: campus_life__default
+Documents on disk: 88
+Chunks indexed: 134
+Chunks containing their document's title line: 134 of 134
+
+All indexed chunks carry their title line.
+```
+
+This is the criterion that stopped being free. In unit 1 the starter's
+fixed-window chunker cut nothing and all 88 documents went in whole, so their
+titles were attached by definition. The paragraph-packing chunker in
+`chunker.py::split_documents` produces 134 chunks from those 88 documents — 46
+chunks that are not the start of their file — and each one has the title line
+prepended deliberately.
+
+**Criterion 5 — the gate does not refuse questions the corpus can answer.**
+Produced by `gate.py::check`, reported by both `run_eval.py::main` and
+`check_retrieval.py::check`:
+
+```
+How long is the wait at Kestrel Commons between 12:15 and 1:00?
+  best distance: 0.2129 (passed the gate)
+How late in the semester can I declare a course pass/fail?
+  best distance: 0.2058 (passed the gate)
+What do the laundry machines in Aldridge Hall cost, and how do you pay for them?
+  best distance: 0.2446 (passed the gate)
+What time does the library close during reading week?
+  best distance: 0.2192 (passed the gate)
+How is lottery order decided for juniors and seniors in the housing lottery?
+  best distance: 0.2011 (passed the gate)
+
+Criterion 5 — answerable questions refused by the gate: 0 of 5
+```
+
+(The `expects` and chunk lines between each pair are cut for length — the full
+output is in `results/checks_2026-09-30_before.txt`.)
+
+The five answerable questions sit between 0.201 and 0.245; the five
+out-of-corpus ones between 0.825 and 0.923. The cutoff of 0.60 sits inside a gap
+0.58 wide with nothing in it, which is why neither criterion 3 nor criterion 5
+is close: the narrowest margin between the cutoff and any distance I measured is
+0.225, the Mongolia question.
 
 ## Verdicts
 
