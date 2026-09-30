@@ -44,7 +44,7 @@ def check(corpus: str | None = None, variant: str = "default",
     for item in qs.answered():
         question, expects = item["question"], item["expects"]
         results = search(question, top_k=top_k, corpus=corpus, variant=variant)
-        decision = gate.check(results, threshold=threshold)
+        decision = gate.check(results, threshold=threshold, question=question)
         kept = gate.relevant(results, threshold=threshold)
 
         holding = [r for r in kept if expects.lower() in r.text.lower()]

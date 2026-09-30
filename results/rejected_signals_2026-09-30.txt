@@ -1,0 +1,196 @@
+Milestone 4 — two gate signals I measured and rejected, 2026-09-30
+
+Both were tried before the one I kept. Neither is in the project: they are
+here so the rejection is checkable, with the probe source at the bottom.
+
+=== SIGNAL A: gap between rank 1 and rank 2 ===
+Theory: an uncovered question matching a template rather than a document
+comes back 'flat'. Result: points the WRONG way — rejected.
+
+covered      d1     d2    gap  ghosts                 question
+True      0.213  0.281  0.068  []                     How long is the wait at Kestrel Commons betw
+True      0.206  0.429  0.223  []                     How late in the semester can I declare a cou
+True      0.245  0.307  0.062  []                     What do the laundry machines in Aldridge Hal
+True      0.219  0.442  0.223  []                     What time does the library close during read
+True      0.201  0.708  0.507  []                     How is lottery order decided for juniors and
+True      0.338  0.348  0.010  []                     which building has somewhere quiet to work l
+True      0.379  0.379  0.000  []                     when should I do my laundry to avoid waiting
+False     0.405  0.444  0.040  ['Ashford']            What are the dorm rooms like in Ashford Hall
+False     0.421  0.464  0.043  []                     What time does the campus gym open?
+True      0.482  0.511  0.029  []                     is it worth eating lunch early to skip the q
+True      0.525  0.565  0.040  []                     can I still drop a class after seeing my mid
+False     0.559  0.608  0.048  []                     How much is tuition next year?
+False     0.636  0.655  0.019  []                     How do I sign up for intramural sports?
+False     0.825  0.826  0.001  ['Mongolia']           What is the capital of Mongolia?
+False     0.923  0.934  0.011  []                     How do I change the oil in a diesel engine?
+False     0.886  0.899  0.013  ['Cup']                Who won the 1994 World Cup?
+False     0.848  0.849  0.001  []                     What is the recommended dosage of ibuprofen 
+False     0.877  0.896  0.019  ['Rust']               How do I write a for loop in Rust?
+
+Signal A (gap): covered min gap 0.000; uncovered near-corpus gaps [0.04, 0.043, 0.048]
+Signal B (ghost nouns): covered with ghosts []; uncovered-under-cutoff with ghosts ['What are the dorm rooms like i']
+
+=== SIGNAL B-naive: any content word absent from the corpus ===
+Theory: uncovered questions name things the corpus never mentions.
+Result: so do covered ones — 'lunch', 'close', 'eating', 'decided',
+'seeing' are all absent. This rule refuses real questions — rejected.
+
+covered  (test)    absent=[]                                             How long is the wait at Kestrel Commons between 12
+covered  (test)    absent=[]                                             How late in the semester can I declare a course pa
+covered  (test)    absent=['them']                                       What do the laundry machines in Aldridge Hall cost
+covered  (test)    absent=['close']                                      What time does the library close during reading we
+covered  (test)    absent=['decided']                                    How is lottery order decided for juniors and senio
+covered  (probe)   absent=['somewhere']                                  which building has somewhere quiet to work late at
+covered  (probe)   absent=['avoid', 'waiting']                           when should I do my laundry to avoid waiting for a
+UNCOVERED  (probe) absent=['dorm', 'ashford']                            What are the dorm rooms like in Ashford Hall?
+UNCOVERED  (probe) absent=['gym']                                        What time does the campus gym open?
+covered  (probe)   absent=['eating', 'lunch']                            is it worth eating lunch early to skip the queue
+covered  (probe)   absent=['seeing']                                     can I still drop a class after seeing my midterm g
+UNCOVERED  (probe) absent=['tuition']                                    How much is tuition next year?
+UNCOVERED  (probe) absent=['intramural', 'sports']                       How do I sign up for intramural sports?
+UNCOVERED (oos)    absent=['capital', 'mongolia']                        What is the capital of Mongolia?
+UNCOVERED (oos)    absent=['oil', 'diesel', 'engine']                    How do I change the oil in a diesel engine?
+UNCOVERED (oos)    absent=['won', '1994', 'cup']                         Who won the 1994 World Cup?
+UNCOVERED (oos)    absent=['recommended', 'dosage', 'ibuprofen', 'headache'] What is the recommended dosage of ibuprofen for a 
+UNCOVERED (oos)    absent=['rust']                                       How do I write a for loop in Rust?
+
+=== SIGNAL B2: capitalised name absent from the retrieved chunks (KEPT) ===
+
+covered      d1  entities                   missing from grounding   verdict
+True      0.213  ['Kestrel', 'Commons']     []                       
+True      0.206  []                         []                       
+True      0.245  ['Aldridge', 'Hall']       []                       
+True      0.219  []                         []                       
+True      0.201  []                         []                       
+True      0.338  []                         []                       
+True      0.379  []                         []                       
+False     0.405  ['Ashford', 'Hall']        ['Ashford']              refuses (good)
+False     0.421  []                         []                       
+True      0.482  []                         []                       
+True      0.525  []                         []                       
+False     0.559  []                         []                       
+False     0.636  []                         []                       
+False     0.825  ['Mongolia']               ['Mongolia']             refuses (good)
+False     0.923  []                         []                       
+False     0.886  ['World', 'Cup']           ['Cup']                  refuses (good)
+False     0.848  []                         []                       
+False     0.877  ['Rust']                   ['Rust']                 refuses (good)
+
+false refusals of covered questions: 0
+
+════════════════════════════════════════════════════════════════════
+Probe source, for re-running these:
+
+──── signals.py ────
+"""Two candidate gate signals, measured on all 18 questions.
+
+A: gap between rank 1 and rank 2 — is an uncovered near-corpus question 'flat'
+   (many template docs equally close) where a covered one is 'peaked'?
+B: a capitalised proper noun in the question that appears nowhere in the corpus.
+"""
+import re
+import config, questions as qs
+from store import search
+from ingest import load_documents
+from check_boundary import PROBES
+
+docs = load_documents()
+vocab = set()
+for d in docs:
+    vocab |= set(re.findall(r"[a-z0-9']+", d.text.lower()))
+
+def ghost_nouns(q):
+    """Capitalised words, not sentence-initial, absent from the corpus."""
+    tokens = re.findall(r"\b[A-Za-z][a-z']+\b", q)
+    return [w for w in tokens[1:] if w[0].isupper() and w.lower() not in vocab]
+
+groups = (
+    [(item["question"], True) for item in qs.answered()]
+    + [(q, lab == "covered") for q, lab in PROBES]
+    + [(q, False) for q in qs.OUT_OF_SCOPE]
+)
+
+print(f"{'covered':<8} {'d1':>6} {'d2':>6} {'gap':>6}  {'ghosts':<22} question")
+rows = []
+for q, covered in groups:
+    r = search(q, top_k=5, corpus=config.CORPUS)
+    d1, d2 = r[0].distance, r[1].distance
+    g = ghost_nouns(q)
+    rows.append((covered, d1, d2 - d1, g, q))
+    print(f"{str(covered):<8} {d1:>6.3f} {d2:>6.3f} {d2-d1:>6.3f}  {str(g):<22} {q[:44]}")
+
+cov = [r for r in rows if r[0]]
+unc = [r for r in rows if not r[0]]
+print(f"\nSignal A (gap): covered min gap {min(r[2] for r in cov):.3f}; "
+      f"uncovered near-corpus gaps {[round(r[2],3) for r in unc if r[1] < 0.6]}")
+print(f"Signal B (ghost nouns): covered with ghosts "
+      f"{[r[4][:30] for r in cov if r[3]]}; "
+      f"uncovered-under-cutoff with ghosts {[r[4][:30] for r in unc if r[3] and r[1] < 0.6]}")
+
+──── vocab.py ────
+"""Go/no-go: does 'question contains a word the corpus never uses' separate
+covered questions from uncovered ones?"""
+import re
+import config, questions as qs
+from ingest import load_documents
+from check_boundary import PROBES
+
+STOP = set("""a an and are as at be been but by can could do does for from
+get got has have how i if in into is it its just like me much my next of on or
+should so than that the their there these they this to want was what when where
+which who why will with you your during between am pm still late night early
+time times good best worth sign up out about after before does""".split())
+
+docs = load_documents()
+vocab = set()
+for d in docs:
+    vocab |= set(re.findall(r"[a-z0-9']+", d.text.lower()))
+
+groups = (
+    [(item["question"], "covered  (test)") for item in qs.answered()]
+    + [(q, f"{'covered' if lab == 'covered' else 'UNCOVERED'}  (probe)") for q, lab in PROBES]
+    + [(q, "UNCOVERED (oos)") for q in qs.OUT_OF_SCOPE]
+)
+
+for q, group in groups:
+    words = [w for w in re.findall(r"[a-z0-9']+", q.lower()) if w not in STOP and len(w) > 2]
+    absent = [w for w in words if w not in vocab]
+    print(f"{group:<18} absent={str(absent):<46} {q[:50]}")
+
+──── signalb2.py ────
+"""Variant B2: a capitalised entity in the question that appears in none of the
+chunks the gate is about to accept. Cheaper than a corpus scan, and it also
+catches retrieval bringing back the wrong building for a real one."""
+import re
+import config, gate, questions as qs
+from store import search
+from check_boundary import PROBES
+
+def entities(q):
+    tokens = re.findall(r"\b[A-Za-z][A-Za-z']+\b", q)
+    return [w for w in tokens[1:] if w[0].isupper()]
+
+groups = (
+    [(item["question"], True) for item in qs.answered()]
+    + [(q, lab == "covered") for q, lab in PROBES]
+    + [(q, False) for q in qs.OUT_OF_SCOPE]
+)
+
+print(f"{'covered':<8} {'d1':>6}  {'entities':<26} {'missing from grounding':<24} verdict")
+fp = fn = 0
+for q, covered in groups:
+    r = search(q, top_k=5, corpus=config.CORPUS)
+    kept = gate.relevant(r, threshold=config.THRESHOLD)
+    blob = " ".join(c.text for c in kept).lower()
+    ents = entities(q)
+    missing = [e for e in ents if e.lower() not in blob]
+    would_refuse = bool(missing)
+    if covered and would_refuse:
+        fp += 1; verdict = "FALSE REFUSAL"
+    elif not covered and would_refuse:
+        verdict = "refuses (good)"
+    else:
+        verdict = ""
+    print(f"{str(covered):<8} {r[0].distance:>6.3f}  {str(ents):<26} {str(missing):<24} {verdict}")
+
+print(f"\nfalse refusals of covered questions: {fp}")

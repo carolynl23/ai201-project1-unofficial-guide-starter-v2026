@@ -54,7 +54,7 @@ def measure(corpus=None, variant="default", top_k=None, threshold=None) -> list[
     rows = []
     for question, group, should_answer in groups:
         results = search(question, top_k=top_k, corpus=corpus, variant=variant)
-        decision = gate.check(results, threshold=threshold)
+        decision = gate.check(results, threshold=threshold, question=question)
         group = f"{group} ({'covered' if should_answer else 'uncovered'})"
         rows.append(
             {

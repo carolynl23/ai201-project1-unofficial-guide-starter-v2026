@@ -58,7 +58,7 @@ def run_once(question: str, top_k, threshold, corpus, variant):
     from generate import answer_from_chunks
 
     results = search(question, top_k=top_k, corpus=corpus, variant=variant)
-    decision = gate.check(results, threshold=threshold)
+    decision = gate.check(results, threshold=threshold, question=question)
 
     if not decision.passed:
         return gate.REFUSAL, results, decision
@@ -165,7 +165,7 @@ def check_out_of_scope(top_k, threshold, corpus, variant):
     rows = []
     for question in questions:
         results = search(question, top_k=top_k, corpus=corpus, variant=variant)
-        decision = gate.check(results, threshold=threshold)
+        decision = gate.check(results, threshold=threshold, question=question)
         refused = not decision.passed
         print(f"  {'refused' if refused else 'LET THROUGH'}  "
               f"(best distance {decision.best_distance:.3f})  {question}")

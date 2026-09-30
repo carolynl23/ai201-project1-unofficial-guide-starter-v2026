@@ -795,34 +795,109 @@ the more useful truth.
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** The gate now looks at a second thing besides distance. If a
+question uses a capitalised name that appears in **none of the chunks it was
+about to hand to the model**, it refuses. That's `gate.py::unnamed_entities`,
+consulted by `gate.py::check` after the distance test passes, and switchable
+with `GATE_REQUIRE_NAMED_ENTITIES` in `config.py` so both versions stay
+runnable. One change: no new retrieval, no re-chunking, same cutoff at 0.60.
 
-**Why I picked it:**
+**Why I picked it:** My diagnosis said the gate answers uncovered campus
+questions because a distance cannot express "on topic but not covered" — an
+invented hall scores 0.405 against twenty-one real housing documents while a
+real question about dropping a class scores 0.525 — and a capitalised name is
+the one part of such a question I can check directly rather than by similarity.
 
-<!-- Connect it to a specific diagnosis above in one sentence. If you can't,
-     you picked a fix because it sounded impressive. -->
+Two things I did *not* do, and why. **Hybrid search** was the obvious pick and my
+diagnosis rules it out: BM25 would score "dorm rooms like hall" against
+twenty-one housing documents and rank them highly, because the only token that
+makes the question unanswerable — *Ashford* — is absent from the corpus and so
+contributes nothing to a BM25 score. It would reinforce the failure, not fix it.
+**A lower cutoff** is ruled out by the same table: covered questions run to 0.525
+and uncovered ones start at 0.405, so no cutoff separates them and any value low
+enough to stop Ashford Hall refuses real questions first.
+
+I also tried two signals before this one and threw both away. Both measurements,
+and the probes that produced them, are in
+`results/rejected_signals_2026-09-30.txt`:
+
+- **Rank-1-to-rank-2 gap**, on the theory that a question matching a template
+  rather than a document would come back flat. It points the *wrong way*:
+  covered questions have gaps as small as 0.000 and 0.010, while the three
+  uncovered near-corpus ones sit at 0.040, 0.043 and 0.048. Dead on the data.
+- **Any question word absent from the corpus**, which sounds like the same idea
+  as what I built and is much worse. "lunch", "close", "eating", "decided" and
+  "seeing" are all absent from this corpus, and all five come from questions it
+  answers — so that rule refuses nearly every real question. This is why the
+  check I built only looks at capitalised names, and why the gym and tuition
+  questions still get through.
 
 ### Run Log — After
 
-<!-- Same format, same five criteria, three runs each.
-     `python run_eval.py --label after` -->
+`python run_eval.py --label after`, three runs, caching off, same corpus, same
+top-k, same 0.60 cutoff. Evidence: `results/run_2026-09-30_0254_after.md` and
+`results/checks_2026-09-30_after.txt`.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunk contains the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Every chunk carries its document's title line | all chunks | 134/134 | 134/134 | 134/134 | MET |
+| 5. Gate does not refuse questions the corpus can answer | 0 refused of 5 | 0/5 | 0/5 | 0/5 | MET |
+
+Side by side with the before run, which is the whole point of the table:
+
+| Criterion | Before | After | Moved? |
+|---|---|---|---|
+| 1. Retrieved chunk contains the answer | 5/5, 5/5, 5/5 | 5/5, 5/5, 5/5 | no |
+| 2. Every answer names a source | 5/5, 5/5, 5/5 | 5/5, 5/5, 5/5 | no |
+| 3. Gate stops out-of-corpus questions | 5/5 | 5/5 | no |
+| 4. Every chunk carries its title line | 134/134 | 134/134 | no |
+| 5. Gate does not refuse answerable questions | 0/5 refused | 0/5 refused | no |
+| *(Milestone 3's proposed criterion: stops on-topic uncovered questions)* | *1 of 4* | *2 of 4* | **yes** |
+| *(near-corpus questions the gate is wrong about, of 18)* | *3* | *2* | **yes** |
+| *(model calls spent on the Ashford Hall question)* | *1, 600 tokens* | *0* | **yes** |
 
 **Did it help?**
 
-<!-- Say plainly whether it did, and how you know. If it made things worse,
-     say that — a change that backfired, honestly reported, earns full credit
-     and is more interesting than one that worked. What matters is that you can
-     tell.
+Yes, and it moved none of my five criteria — which is the same finding twice
+rather than a disappointment.
 
-     Milestone 4. -->
+What it did: the Ashford Hall question is now refused by the gate at 0.405
+instead of passing it, `gate.py` explains itself as *"best distance 0.405 is
+under the 0.6 cutoff, but nothing retrieved mentions 'Ashford' — refusing"*, and
+it costs nothing. Cold-cache, before the change that question cost one model call
+and 600 tokens to answer with a refusal; after, zero. The number my diagnosis
+named — near-corpus questions the gate gets wrong — went from 3 of 18 to 2 of 18,
+and no covered question changed behaviour: all nine still answered, criterion 5
+still 0 refusals of 5.
+
+What it did not do: move a single one of my five criteria, in any of the three
+runs. I predicted that in Milestone 3 and it's worth being plain about why rather
+than treating it as bad luck. All five criteria are measured on the ten questions
+at the two ends of the distance range, the change only acts between 0.405 and
+0.60, and nothing I promised to measure lives there. **A fix aimed at a real
+failure produced a completely unchanged run log, and that is a fact about my
+criteria rather than about the fix.** If I had only the five-criterion table to
+go on, I would have concluded this change did nothing.
+
+Where it stops, honestly: two of the three near-corpus failures survive. *"What
+time does the campus gym open?"* and *"How much is tuition next year?"* name
+their uncovered subject in lowercase — "gym", "tuition" — and I measured that I
+cannot refuse on a lowercase absent word without refusing questions about lunch
+and closing times. Both still cost a model call, and both are still caught by the
+grounding instruction in `generate.py`, which is the layer doing the real work
+here and the layer I still have no criterion for.
+
+One methodology note, because it nearly cost me the comparison: I ran
+`tools/smoke_test.py` mid-unit, which sets `AI201_FAKE_EMBEDDINGS=1` and rebuilds
+`campus_life__default`, so every distance I measured immediately afterwards was
+nonsense — 0.81 to 0.97 across the board, covered and uncovered alike. I
+re-indexed and re-ran the before measurement with `AI201_GATE_ENTITIES=0` to
+confirm it reproduced the committed numbers exactly (3 of 18 wrong, covered
+0.201–0.525) before trusting any after number. The before/after pair above is
+measured on the same index, minutes apart, one flag between them.
 
 ## What's Still Broken
 

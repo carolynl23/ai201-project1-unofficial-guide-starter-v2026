@@ -107,6 +107,19 @@ TOP_K = 5               # how many chunks to pull back per question
 # questions I have the answer to.
 THRESHOLD = 0.60
 
+# Unit 2's improvement, and the second thing the gate looks at.
+#
+# THRESHOLD alone cannot express "on topic but not covered": an invented hall
+# scores 0.405 against twenty-one real housing documents while a real question
+# about dropping a class scores 0.525. With this on, the gate also refuses when
+# the question uses a capitalised name that appears in none of the chunks it was
+# about to hand over — the Ashford Hall case — before a model call is made.
+#
+# AI201_GATE_ENTITIES=0 gets the unit 1 gate back without editing this file,
+# which is how the before/after pair in the README was measured. results/ holds
+# a run log from each setting.
+GATE_REQUIRE_NAMED_ENTITIES = os.getenv("AI201_GATE_ENTITIES", "1") != "0"
+
 
 # ─── Models ──────────────────────────────────────────────────────────────────
 # Embeddings run on your own machine and cost no API quota.

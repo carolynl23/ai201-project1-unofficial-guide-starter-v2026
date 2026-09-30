@@ -1,0 +1,45 @@
+Checks for criteria 1, 2, 4, 5 — AFTER (GATE_REQUIRE_NAMED_ENTITIES=True)
+Run: 2026-09-30, corpus campus_life, top-k 5, cutoff 0.60
+
+=== python check_retrieval.py  (criteria 1 and 5) ===
+  ANSWER PRESENT at rank 1 of 1 kept: admin_housing_lottery.txt#0 at 0.201
+
+Criterion 1 — answer present in a retrieved chunk: 5 of 5
+             — answer present in the TOP-RANKED chunk: 5 of 5 (ranks: 1, 1, 1, 1, 1)
+Criterion 5 — answerable questions refused by the gate: 0 of 5
+
+=== python check_titles.py  (criterion 4) ===
+Collection: campus_life__default
+Documents on disk: 88
+Chunks indexed: 134
+Chunks containing their document's title line: 134 of 134
+Chunks that are nothing but a title line (trivial passes): 0
+Index is current with chunker.py::split_documents (134 chunks, same ids and same text).
+
+All indexed chunks carry their title line.
+
+=== python tools/audit_citations.py results/run_2026-09-30_0254_after.md  (criterion 2) ===
+Auditing results/run_2026-09-30_0254_after.md
+
+15 answers checked
+answers naming no source (criterion 2 as written): 0
+answers citing a file retrieval did not return: 0
+answers whose cited files exclude the document holding the answer (criterion 2 tightened): 0
+
+=== python check_boundary.py  (the near-corpus set the change targets) ===
+ 0.886  refuses         out of scope (uncovered)   Who won the 1994 World Cup?
+ 0.923  refuses         out of scope (uncovered)   How do I change the oil in a diesel engine?
+
+covered questions, distance range:   0.201 – 0.525
+uncovered questions, distance range: 0.405 – 0.923
+the gate is wrong about 2 of 18, all of them uncovered questions it answers:
+  0.421  What time does the campus gym open?
+  0.559  How much is tuition next year?
+
+=== same, with the unit 1 gate: AI201_GATE_ENTITIES=0 ===
+covered questions, distance range:   0.201 – 0.525
+uncovered questions, distance range: 0.405 – 0.923
+the gate is wrong about 3 of 18, all of them uncovered questions it answers:
+  0.405  What are the dorm rooms like in Ashford Hall?
+  0.421  What time does the campus gym open?
+  0.559  How much is tuition next year?

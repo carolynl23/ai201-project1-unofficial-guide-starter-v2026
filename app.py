@@ -167,7 +167,7 @@ def cmd_retrieve(args):
         preview = r.text[:52].replace("\n", " ")
         print(f"{i:<3} {r.distance:<10.4f} {r.source:<32} {preview}...")
 
-    decision = gate.check(results)
+    decision = gate.check(results, question=args.question)
     print(f"\nGate: {decision.explanation}")
     print("\nLower is better. 0.3 is a close match, 0.9 is unrelated.")
     print("Milestone 4: run your five questions, then the five in OUT_OF_SCOPE")
@@ -209,7 +209,7 @@ def ask_pipeline(
         corpus=corpus or config.CORPUS,
         variant=variant,
     )
-    decision = gate.check(results, threshold=threshold)
+    decision = gate.check(results, threshold=threshold, question=question)
     if on_gate is not None:
         on_gate(decision)
 
