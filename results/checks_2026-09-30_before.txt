@@ -41,5 +41,7 @@ Collection: campus_life__default
 Documents on disk: 88
 Chunks indexed: 134
 Chunks containing their document's title line: 134 of 134
+Chunks that are nothing but a title line (trivial passes): 0
+Index is current with chunker.py::split_documents (134 chunks, same ids and same text).
 
 All indexed chunks carry their title line.

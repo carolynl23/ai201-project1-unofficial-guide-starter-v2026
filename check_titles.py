@@ -22,6 +22,7 @@ import sys
 
 import config
 import store
+from chunker import split_documents
 from ingest import load_documents
 
 
@@ -32,10 +33,8 @@ def check(corpus: str | None = None, variant: str = "default") -> dict:
     Returns the count, the number carrying their title, and the chunks that
     don't — by chunk label, so a failure is something you can go and look at.
     """
-    titles = {
-        doc.source: doc.text.split("\n", 1)[0].strip()
-        for doc in load_documents(corpus)
-    }
+    docs = load_documents(corpus)
+    titles = {doc.source: doc.text.split("\n", 1)[0].strip() for doc in docs}
 
     name = config.collection_name(corpus, variant)
     try:
@@ -49,6 +48,7 @@ def check(corpus: str | None = None, variant: str = "default") -> dict:
 
     missing = []
     unknown = []
+    title_only = []
     for text, meta in zip(stored["documents"], stored["metadatas"]):
         source = str(meta.get("source", "unknown"))
         label = f"{source}#{meta.get('index', 0)}"
@@ -57,6 +57,20 @@ def check(corpus: str | None = None, variant: str = "default") -> dict:
             unknown.append(label)
         elif title not in text:
             missing.append(label)
+        elif text.strip() == title:
+            # Carrying the title is trivially true of a chunk that is nothing
+            # but the title. Counted separately so the headline number can't be
+            # inflated by chunks with no body in them.
+            title_only.append(label)
+
+    # A pass here means nothing if the index is older than the chunker. Compare
+    # what's stored against what split_documents produces from the documents on
+    # disk right now, so a stale index is reported rather than quietly counted.
+    fresh = {f"{c.source}#{c.index}": c.text for c in split_documents(docs)}
+    stale = sorted(set(stored["ids"]) ^ set(fresh)) + [
+        i for i, text in zip(stored["ids"], stored["documents"])
+        if i in fresh and fresh[i] != text
+    ]
 
     total = len(stored["documents"])
     return {
@@ -66,6 +80,9 @@ def check(corpus: str | None = None, variant: str = "default") -> dict:
         "missing": missing,
         "unknown": unknown,
         "documents": len(titles),
+        "title_only": title_only,
+        "stale": sorted(set(stale)),
+        "fresh_total": len(fresh),
     }
 
 
@@ -84,6 +101,26 @@ def main():
         f"Chunks containing their document's title line: "
         f"{report['carrying']} of {report['total']}"
     )
+
+    print(
+        f"Chunks that are nothing but a title line (trivial passes): "
+        f"{len(report['title_only'])}"
+    )
+
+    if report["stale"]:
+        print(
+            f"\n⚠️  The index is out of step with chunker.py: "
+            f"{len(report['stale'])} chunk(s) differ from what split_documents "
+            f"produces now ({report['fresh_total']} chunks). Re-run "
+            f"`python app.py index` — the count above is about an old index."
+        )
+        for label in report["stale"][:10]:
+            print(f"  {label}")
+    else:
+        print(
+            f"Index is current with chunker.py::split_documents "
+            f"({report['fresh_total']} chunks, same ids and same text)."
+        )
 
     if report["unknown"]:
         print(f"\nChunks whose source file is no longer on disk ({len(report['unknown'])}):")

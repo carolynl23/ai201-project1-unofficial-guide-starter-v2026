@@ -514,9 +514,16 @@ Collection: campus_life__default
 Documents on disk: 88
 Chunks indexed: 134
 Chunks containing their document's title line: 134 of 134
+Chunks that are nothing but a title line (trivial passes): 0
+Index is current with chunker.py::split_documents (134 chunks, same ids and same text).
 
 All indexed chunks carry their title line.
 ```
+
+The last two lines were added in Milestone 2, when I went looking for ways this
+number could be true and worthless: a chunk that is only a title carries its
+title by definition, and a count taken over an index older than the chunker is a
+count about code I no longer run. Neither applies here.
 
 This is the criterion that stopped being free. In unit 1 the starter's
 fixed-window chunker cut nothing and all 88 documents went in whole, so their
@@ -550,8 +557,11 @@ output is in `results/checks_2026-09-30_before.txt`.)
 The five answerable questions sit between 0.201 and 0.245; the five
 out-of-corpus ones between 0.825 and 0.923. The cutoff of 0.60 sits inside a gap
 0.58 wide with nothing in it, which is why neither criterion 3 nor criterion 5
-is close: the narrowest margin between the cutoff and any distance I measured is
-0.225, the Mongolia question.
+is close: within these runs the narrowest margin between the cutoff and any
+distance is 0.225, the Mongolia question. Unit 1 found tighter ones by going
+looking for them — a paraphrase of an answerable question at 0.525 and an
+uncovered campus question at 0.636 — so the gap is this clean only for the ten
+questions in this run log.
 
 ## Verdicts
 
@@ -566,11 +576,70 @@ is close: the narrowest margin between the cutoff and any distance I measured is
 
 | # | Criterion | Verdict | How I decided |
 |---|---|---|---|
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
-| 5 |  |  |  |
+| 1 | Retrieved chunks contain the answer, 4 of 5 | MET | 5 of 5 on all three runs. I didn't take the `expects` substring's word for it — I opened all five source documents and read the sentence the chunk was matching on, so the count is "the chunk holds the answer", not "the chunk holds the phrase". |
+| 2 | Every answer names a source, 5 of 5 | MET | All 15 answers named at least one file. The citation format wandered between runs and the file never did, and `tools/audit_citations.py` confirms no answer cited a file that retrieval hadn't returned for that question — so none of the 15 passed on an invented filename. |
+| 3 | Gate stops out-of-corpus questions, 4 of 5 | MET | 5 of 5 refused at 0.825–0.923 against a 0.60 cutoff. The run log only proves `gate.py::check` said no, so I re-asked all five through `app.py ask` and got the exact wording the criterion names, at 0 model calls. |
+| 4 | Every chunk carries its document's title line, all chunks | MET | 134 of 134, counted over the indexed collection rather than a re-chunk. The number would be worthless on a stale index, so `check_titles.py` now also compares stored ids and text against `split_documents`, and they match. |
+| 5 | No test question refused by the gate, 0 of 5 | MET | 0 refused; the five sit at 0.201–0.245 against a 0.60 cutoff, so none was near the line. But see below — this is the verdict I trust least, and the reason isn't the number. |
+
+No criterion was revised. I went looking for one — a criterion that turned out
+unmeasurable would have been worth more to me than a fifth MET — and none of the
+five had that problem. All five said something checkable, and I checked them the
+way they were written.
+
+### Arguing the other side
+
+Five METs is the shape of a run log that flattered itself, so I tried to break
+each verdict rather than confirm it. The output is in
+`results/verdict_checks_2026-09-30.txt`. Four of the five attacks failed:
+
+- **Criterion 1: the `expects` phrase isn't the answer.** `10pm` appearing in a
+  chunk doesn't mean that chunk says the library closes at 10pm during reading
+  week — it could be term hours, with reading week elsewhere. This was the
+  attack I expected to land, because `study_library_hours.txt` holds both
+  numbers. It says *"Open until 2am during term, until 10pm during reading
+  week"* — same sentence, and reading week is the one attached to 10pm. All five
+  survived reading: the pass/fail chunk says *"you can declare it as late as
+  week eight"*, the laundry chunk *"$1.75 wash, $1.50 dry, card only"*, the
+  lottery chunk *"juniors and seniors are ordered by accumulated credit hours
+  first"*. No question passed criterion 1 on a phrase that appeared for the
+  wrong reason.
+- **Criterion 2: a named source could be a fabricated filename.** Criterion 2 as
+  written would count `dining_kestrel_hall.txt` — a file that doesn't exist — as
+  naming a source. `tools/audit_citations.py::audit` found 0 of 15 citing
+  anything retrieval hadn't returned. The criterion is weaker than I'd write it
+  today, but the system doesn't exploit the weakness.
+- **Criterion 3: I measured the gate, not the system.** The criterion says the
+  *system* returns "I don't have enough information about that", and
+  `run_eval.py::check_out_of_scope` only records a boolean. Re-asking all five
+  through `app.py ask` produced that string exactly, five times.
+- **Criterion 4: the check could be passing on a stale index.** `check_titles.py`
+  read Chroma, and nothing said Chroma matched the current chunker — if the
+  index were left over from the fixed-window chunker, 134 of 134 would be a fact
+  about code I no longer run. It matches: same 134 ids, same text, and no chunk
+  is title-only, so nothing passed by being nothing but its title.
+
+**The fifth attack lands, and I'm recording it as a weakness rather than a
+miss.** Criterion 5 asks whether the gate wrongly refuses questions the corpus
+can answer, and my five test questions are the easiest possible way to ask that.
+Each one shares its proper nouns with the document that answers it — "Kestrel
+Commons", "Aldridge Hall", "pass/fail", "reading week" — which is why they land
+at 0.201 to 0.245 and why the criterion says zero and not one. So 0 of 5 is real
+but it is measured at the easy end of the range, and my own Milestone 4 numbers
+say where the hard end is: the worst paraphrase I could write of a question the
+corpus answers came in at 0.525. That is 0.075 from the cutoff, not 0.355. A
+paraphrase set rather than a proper-noun set is what would actually put
+criterion 5 at risk, and criterion 5 as written doesn't require one.
+
+That is a gap in the criterion, not a misreading of the result, so the verdict
+stays MET and the fix is a new measurement — five paraphrased questions that
+never touched the threshold. Milestone 5, not here.
+
+Criterion 1's target has the same shape of problem. 4 of 5 was set expecting the
+housing lottery question to fail, and it came back the *closest* match of the
+five at 0.2011 — so the target held with a question to spare, and a target that
+survives the one question it was written around is looser than it looked. That's
+Milestone 3's problem, not a revision: the criterion measured what it said.
 
 ## Diagnoses
 

@@ -1,0 +1,47 @@
+Milestone 2 — checks run against the verdicts, 2026-09-30
+Each one exists to try to break a MET verdict, not to confirm it.
+
+=== 1. Criterion 3 end to end: python app.py ask <each OUT_OF_SCOPE question> ===
+    (the run log measures gate.py::check; this is the whole app path)
+
+-- What is the capital of Mongolia?
+  (best distance 0.825, cutoff 0.6)
+I don't have enough information about that.
+0 model calls this session
+-- How do I change the oil in a diesel engine?
+  (best distance 0.923, cutoff 0.6)
+I don't have enough information about that.
+0 model calls this session
+-- Who won the 1994 World Cup?
+  (best distance 0.886, cutoff 0.6)
+I don't have enough information about that.
+0 model calls this session
+-- What is the recommended dosage of ibuprofen for a headache?
+  (best distance 0.848, cutoff 0.6)
+I don't have enough information about that.
+0 model calls this session
+-- How do I write a for loop in Rust?
+  (best distance 0.877, cutoff 0.6)
+I don't have enough information about that.
+0 model calls this session
+
+=== 2. Criterion 2 harder than asked: python tools/audit_citations.py ===
+    (audit_citations.py::audit — did any answer cite a file retrieval never returned?)
+
+Auditing results/run_2026-09-30_0158_before.md
+
+15 answers checked
+answers naming no source: 0
+answers citing a file retrieval did not return: 0
+
+=== 3. Criterion 4 not passing on a stale index or on title-only chunks ===
+    (check_titles.py::check)
+
+Collection: campus_life__default
+Documents on disk: 88
+Chunks indexed: 134
+Chunks containing their document's title line: 134 of 134
+Chunks that are nothing but a title line (trivial passes): 0
+Index is current with chunker.py::split_documents (134 chunks, same ids and same text).
+
+All indexed chunks carry their title line.
